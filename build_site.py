@@ -35,16 +35,21 @@ def fig_cards():
         df[c] = pd.to_numeric(df[c], errors="coerce")
     df["character"] = df["card"].map(char_of)
     df["short"] = df["card"].str.split("-", n=1).str[-1]
+
+    # per-character Strike baseline (starter: has deck_winrate, no pick rate)
+    strike = df[df["short"] == "STRIKE"].set_index("character")["deck_winrate"]
+
     s_df = df[(df.offered_3c >= 20) & (df.runs_with_card >= 20)
               & df.pick_rate_3c.notna() & df.deck_winrate.notna()].copy()
     chars = [c for c in CHAR_ORDER if c in s_df.character.unique()]
     mx, my = s_df.pick_rate_3c.median(), s_df.deck_winrate.median()
+
     fig = go.Figure()
     for ch in chars:
         s = s_df[s_df.character == ch]
         fig.add_trace(go.Scatter(
             x=s.pick_rate_3c, y=s.deck_winrate, mode="markers+text",
-            name=f"{ch} ({len(s)})",
+            name=f"{ch} ({len(s)})", legendgroup=ch,          # <- group
             marker=dict(size=(s.times_offered**0.5)*0.9, sizemin=3,
                         color=COLORS[ch], opacity=0.6, line=dict(width=0)),
             text=s.short, textposition="top center",
@@ -54,10 +59,21 @@ def fig_cards():
             hovertemplate=("<b>%{customdata[0]}</b><br>pick 3c: %{customdata[4]:.1%}<br>"
                            "winrate: %{customdata[3]:.1%}<br>offered %{customdata[1]} · "
                            "runs %{customdata[2]}<extra>"+ch+"</extra>")))
+
+    # Strike baseline lines, one per character, toggled with the character
+    for ch in chars:
+        if ch in strike.index and pd.notna(strike[ch]):
+            fig.add_trace(go.Scatter(
+                x=[0, 1], y=[strike[ch], strike[ch]], mode="lines",
+                line=dict(color=COLORS[ch], dash="dot", width=1),
+                opacity=0.55, name=f"{ch} Strike",
+                legendgroup=ch, showlegend=False,             # <- rides the char toggle
+                hovertemplate=f"{ch} Strike baseline: %{{y:.1%}}<extra></extra>"))
+
     fig.add_vline(x=mx, line=dict(color="grey", dash="dash", width=1))
     fig.add_hline(y=my, line=dict(color="grey", dash="dash", width=1))
     fig.update_layout(template="plotly_white", autosize=True,
-        title="Card draft-priority vs performance",
+        title="Card draft-priority vs performance — dotted line = that character's Strike winrate",
         xaxis=dict(title="pick rate (3-card)", tickformat=".0%", range=[0,1], constrain="domain"),
         yaxis=dict(title="deck winrate", tickformat=".0%", range=[0,1], constrain="domain"),
         legend=dict(title="Character (click to toggle)"))
