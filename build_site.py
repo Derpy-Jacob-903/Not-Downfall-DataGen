@@ -29,8 +29,8 @@ def char_of(card):
     p = str(card).split("-", 1)[0]
     return p if p in set(CHAR_ORDER) else "COLORLESS"
 
-# ================= PLOT 1: card explorer (+ Strike baseline) =================
-def _fig_cards(winrate_col, runs_col, title_suffix):
+# ---- card_stats fetched ONCE, prepped once, reused by all card tabs ----
+def prep_cards():
     df = fetch("card_stats")
     numeric = ["times_offered","offered_3c","runs_with_card","deck_winrate","pick_rate_3c",
                "sp_runs_with_card","sp_deck_winrate","mp_runs_with_card","mp_deck_winrate"]
@@ -39,19 +39,20 @@ def _fig_cards(winrate_col, runs_col, title_suffix):
             df[c] = pd.to_numeric(df[c], errors="coerce")
     df["character"] = df["card"].map(char_of)
     df["short"] = df["card"].str.split("-", n=1).str[-1]
+    return df
 
-    # Strike baseline uses the SAME winrate column as the plot, so the line matches
+# ================= card explorer (parameterized) =================
+def _fig_cards(df, winrate_col, runs_col, title_suffix):
     strike_rows = df[df["short"].str.startswith("STRIKE", na=False)
                      & df["times_offered"].isna()].copy()
     strike = (strike_rows.sort_values(runs_col, ascending=False)
                          .groupby("character")[winrate_col].first())
 
-    # gate on the mode-specific run count so sparse MP cards drop out
     s_df = df[(df.offered_3c >= 20) & (df[runs_col] >= 20)
               & df.pick_rate_3c.notna() & df[winrate_col].notna()].copy()
-    chars = [c for c in CHAR_ORDER if c in s_df.character.unique()]
     if s_df.empty:
         raise ValueError(f"no cards clear the gate for {winrate_col}")
+    chars = [c for c in CHAR_ORDER if c in s_df.character.unique()]
     mx, my = s_df.pick_rate_3c.median(), s_df[winrate_col].median()
 
     fig = go.Figure()
@@ -88,11 +89,47 @@ def _fig_cards(winrate_col, runs_col, title_suffix):
         legend=dict(title="Character (click to toggle)"))
     return fig
 
-def fig_cards():     return _fig_cards("deck_winrate",    "runs_with_card",    "")
-def fig_cards_sp():  return _fig_cards("sp_deck_winrate", "sp_runs_with_card", " · singleplayer")
-def fig_cards_mp():  return _fig_cards("mp_deck_winrate", "mp_runs_with_card", " · multiplayer")
+def fig_cards(df):    return _fig_cards(df, "deck_winrate",    "runs_with_card",    "")
+def fig_cards_sp(df): return _fig_cards(df, "sp_deck_winrate", "sp_runs_with_card", " · singleplayer")
+def fig_cards_mp(df): return _fig_cards(df, "mp_deck_winrate", "mp_runs_with_card", " · multiplayer")
 
-# ================= PLOT 2: winrate over min ascension =================
+def fig_cards_sp_vs_mp(df, min_runs=20):
+    s = df[(df.sp_runs_with_card >= min_runs) & (df.mp_runs_with_card >= min_runs)
+           & df.sp_deck_winrate.notna() & df.mp_deck_winrate.notna()].copy()
+    if s.empty:
+        raise ValueError("no cards clear both SP and MP run gates")
+    s["gap"] = s.mp_deck_winrate - s.sp_deck_winrate
+
+    fig = go.Figure()
+    for ch in CHAR_ORDER:
+        cs = s[s.character == ch]
+        if cs.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=cs.sp_deck_winrate, y=cs.mp_deck_winrate, mode="markers+text",
+            name=f"{ch} ({len(cs)})", legendgroup=ch,
+            marker=dict(size=8, color=COLORS[ch], opacity=0.65, line=dict(width=0)),
+            text=cs.short, textposition="top center", textfont=dict(size=9, color=COLORS[ch]),
+            customdata=cs[["short","sp_deck_winrate","mp_deck_winrate",
+                           "sp_runs_with_card","mp_runs_with_card","gap"]].values,
+            hovertemplate=("<b>%{customdata[0]}</b><br>"
+                           "SP %{customdata[1]:.1%} (n=%{customdata[3]})<br>"
+                           "MP %{customdata[2]:.1%} (n=%{customdata[4]})<br>"
+                           "gap %{customdata[5]:+.1%}<extra>"+ch+"</extra>")))
+    fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode="lines",
+                             line=dict(color="grey", dash="dash", width=1),
+                             name="equal", hoverinfo="skip", showlegend=False))
+    fig.update_layout(template="plotly_white", autosize=True,
+        title=f"Card winrate: singleplayer vs multiplayer (≥{min_runs} runs each · "
+              "above line = stronger in MP)",
+        xaxis=dict(title="singleplayer deck winrate", tickformat=".0%",
+                   range=[0,1], constrain="domain"),
+        yaxis=dict(title="multiplayer deck winrate", tickformat=".0%",
+                   range=[0,1], scaleanchor="x", scaleratio=1),
+        legend=dict(title="Character (click to toggle)"))
+    return fig
+
+# ================= non-card tabs (unchanged) =================
 def fig_ascension():
     df = fetch("character_stats")
     for c in ["min_ascension","total_min_winrate","total_cum_runs"]:
@@ -115,7 +152,6 @@ def fig_ascension():
         legend=dict(title="Character (click to toggle)"))
     return fig
 
-# ================= PLOT 3: daily winrate =================
 def fig_daily(min_runs=5):
     df = fetch("daily_winrate")
     for c in ["runs","wins","winrate"]:
@@ -164,66 +200,31 @@ def fig_survival():
         legend=dict(title="Character (click to toggle)"))
     return fig
 
-def fig_cards_sp_vs_mp(min_runs=20):
-    df = fetch("card_stats")
-    for c in ["sp_runs_with_card","sp_deck_winrate",
-              "mp_runs_with_card","mp_deck_winrate","times_offered"]:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-    df["character"] = df["card"].map(char_of)
-    df["short"] = df["card"].str.split("-", n=1).str[-1]
-
-    s = df[(df.sp_runs_with_card >= min_runs) & (df.mp_runs_with_card >= min_runs)
-           & df.sp_deck_winrate.notna() & df.mp_deck_winrate.notna()].copy()
-    if s.empty:
-        raise ValueError("no cards clear both SP and MP run gates")
-
-    # signed distance from the y=x diagonal: + = better in MP, - = better in SP
-    s["gap"] = s.mp_deck_winrate - s.sp_deck_winrate
-
-    fig = go.Figure()
-    for ch in CHAR_ORDER:
-        cs = s[s.character == ch]
-        if cs.empty:
-            continue
-        fig.add_trace(go.Scatter(
-            x=cs.sp_deck_winrate, y=cs.mp_deck_winrate, mode="markers+text",
-            name=f"{ch} ({len(cs)})", legendgroup=ch,
-            marker=dict(size=8, color=COLORS[ch], opacity=0.65, line=dict(width=0)),
-            text=cs.short, textposition="top center", textfont=dict(size=9, color=COLORS[ch]),
-            customdata=cs[["short","sp_deck_winrate","mp_deck_winrate",
-                           "sp_runs_with_card","mp_runs_with_card","gap"]].values,
-            hovertemplate=("<b>%{customdata[0]}</b><br>"
-                           "SP %{customdata[1]:.1%} (n=%{customdata[3]})<br>"
-                           "MP %{customdata[2]:.1%} (n=%{customdata[4]})<br>"
-                           "gap %{customdata[5]:+.1%}<extra>"+ch+"</extra>")))
-
-    fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode="lines",
-                             line=dict(color="grey", dash="dash", width=1),
-                             name="equal", hoverinfo="skip", showlegend=False))
-    fig.update_layout(template="plotly_white", autosize=True,
-        title=f"Card winrate: singleplayer vs multiplayer (≥{min_runs} runs each · "
-              "above line = stronger in MP)",
-        xaxis=dict(title="singleplayer deck winrate", tickformat=".0%",
-                   range=[0,1], constrain="domain"),
-        yaxis=dict(title="multiplayer deck winrate", tickformat=".0%",
-                   range=[0,1], scaleanchor="x", scaleratio=1),
-        legend=dict(title="Character (click to toggle)"))
-    return fig
-    
-# ================= tabs =================
-TABS = [
-    ("cards",     "Card explorer",        fig_cards),
-    ("cards_sp",  "Cards · singleplayer", fig_cards_sp),
-    ("cards_mp",  "Cards · multiplayer",  fig_cards_mp),
-    ("cards_gap", "Cards · SP vs MP",     fig_cards_sp_vs_mp),
-    ("ascension", "Winrate × ascension",  fig_ascension),
-    ("daily",     "Winrate × day",        fig_daily),
-    ("survival",  "Floor survival",       fig_survival),
-]
-
+# ================= build =================
 def build():
     updated = pd.Timestamp.now("UTC").strftime("%Y-%m-%d %H:%M UTC")
+
+    # fetch the heavy view ONCE, share it across all card tabs
+    try:
+        cards_df = prep_cards()
+    except Exception as e:
+        print(f"card_stats fetch failed, all card tabs skipped: {e}")
+        cards_df = None
+
+    TABS = []
+    if cards_df is not None:
+        TABS += [
+            ("cards",    "Card explorer",        lambda: fig_cards(cards_df)),
+            ("cards_sp", "Cards · singleplayer", lambda: fig_cards_sp(cards_df)),
+            ("cards_mp", "Cards · multiplayer",  lambda: fig_cards_mp(cards_df)),
+            ("cards_gap","Cards · SP vs MP",     lambda: fig_cards_sp_vs_mp(cards_df)),
+        ]
+    TABS += [
+        ("ascension", "Winrate × ascension", fig_ascension),
+        ("daily",     "Winrate × day",       fig_daily),
+        ("survival",  "Floor survival",      fig_survival),
+    ]
+
     buttons, panels, first_ok = [], [], True
     for tid, label, fn in TABS:
         try:
