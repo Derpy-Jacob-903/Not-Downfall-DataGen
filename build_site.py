@@ -37,8 +37,11 @@ def fig_cards():
     df["character"] = df["card"].map(char_of)
     df["short"] = df["card"].str.split("-", n=1).str[-1]
 
-    # per-character Strike baseline (starter card: deck_winrate but no pick rate)
-    strike = df[df["short"] == "STRIKE"].set_index("character")["deck_winrate"]
+    strike_rows = df[df["short"].str.startswith("STRIKE", na=False)
+                     & df["times_offered"].isna()].copy()
+    strike = (strike_rows.sort_values("runs_with_card", ascending=False)
+                         .groupby("character")["deck_winrate"].first())
+    print("strike baselines:", strike.to_dict())   # shows in the Action log
 
     s_df = df[(df.offered_3c >= 20) & (df.runs_with_card >= 20)
               & df.pick_rate_3c.notna() & df.deck_winrate.notna()].copy()
@@ -66,8 +69,8 @@ def fig_cards():
         if ch in strike.index and pd.notna(strike[ch]):
             fig.add_trace(go.Scatter(
                 x=[0, 1], y=[strike[ch], strike[ch]], mode="lines",
-                line=dict(color=COLORS[ch], dash="dot", width=1),
-                opacity=0.55, name=f"{ch} Strike",
+                line=dict(color=COLORS[ch], dash="dot", width=1.5),
+                opacity=0.6, name=f"{ch} Strike",
                 legendgroup=ch, showlegend=False,
                 hovertemplate=f"{ch} Strike baseline: %{{y:.1%}}<extra></extra>"))
 
