@@ -110,12 +110,37 @@ def fig_daily(min_runs=5):
         yaxis=dict(title="winrate", tickformat=".0%"),
         legend=dict(title="Character (click to toggle)"))
     return fig
+    
+def fig_survival():
+    df = fetch("floor_survival")
+    for c in ["min_floor_reached", "frac_surviving", "total_runs"]:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    totals = df.groupby("character")["total_runs"].first()
+    fig = go.Figure()
+    for full in ORDER:
+        s = df[df.character == full].sort_values("min_floor_reached")
+        if s.empty:
+            continue
+        ch = full.split("-")[0]
+        fig.add_trace(go.Scatter(
+            x=s.min_floor_reached, y=s.frac_surviving, mode="lines",
+            name=f"{full} (n={int(totals.get(full, 0))})",
+            line=dict(color=COLORS[ch], width=2),
+            hovertemplate=("floor ≥ %{x}<br>surviving %{y:.1%}"
+                           "<extra>"+full+"</extra>")))
+    fig.update_layout(template="plotly_white", autosize=True,
+        title="Fraction of runs surviving to each floor",
+        xaxis=dict(title="min floor reached"),
+        yaxis=dict(title="fraction surviving", tickformat=".0%"),
+        legend=dict(title="Character (click to toggle)"))
+    return fig
 
 # ================= stitch into a tabbed page =================
 TABS = [
     ("cards",     "Card explorer",      fig_cards),
     ("ascension", "Winrate × ascension", fig_ascension),
     ("daily",     "Winrate × day",      fig_daily),
+    ("survival",  "Floor survival",      fig_survival),
 ]
 
 def build():
