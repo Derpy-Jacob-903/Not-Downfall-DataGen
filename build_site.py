@@ -24,11 +24,12 @@ for i, name in enumerate(CHAR_ORDER):
     rr, gg, bb = colorsys.hsv_to_rgb(i/len(CHAR_ORDER), S, V)
     COLORS[name] = f"#{int(rr*255):02X}{int(gg*255):02X}{int(bb*255):02X}"
 COLORS["COLORLESS"] = "#999999"
+
 def char_of(card):
     p = str(card).split("-", 1)[0]
     return p if p in set(CHAR_ORDER) else "COLORLESS"
 
-# ================= PLOT 1: card explorer =================
+# ================= PLOT 1: card explorer (+ Strike baseline) =================
 def fig_cards():
     df = fetch("card_stats")
     for c in ["times_offered","offered_3c","runs_with_card","deck_winrate","pick_rate_3c"]:
@@ -36,7 +37,7 @@ def fig_cards():
     df["character"] = df["card"].map(char_of)
     df["short"] = df["card"].str.split("-", n=1).str[-1]
 
-    # per-character Strike baseline (starter: has deck_winrate, no pick rate)
+    # per-character Strike baseline (starter card: deck_winrate but no pick rate)
     strike = df[df["short"] == "STRIKE"].set_index("character")["deck_winrate"]
 
     s_df = df[(df.offered_3c >= 20) & (df.runs_with_card >= 20)
@@ -49,7 +50,7 @@ def fig_cards():
         s = s_df[s_df.character == ch]
         fig.add_trace(go.Scatter(
             x=s.pick_rate_3c, y=s.deck_winrate, mode="markers+text",
-            name=f"{ch} ({len(s)})", legendgroup=ch,          # <- group
+            name=f"{ch} ({len(s)})", legendgroup=ch,
             marker=dict(size=(s.times_offered**0.5)*0.9, sizemin=3,
                         color=COLORS[ch], opacity=0.6, line=dict(width=0)),
             text=s.short, textposition="top center",
@@ -67,7 +68,7 @@ def fig_cards():
                 x=[0, 1], y=[strike[ch], strike[ch]], mode="lines",
                 line=dict(color=COLORS[ch], dash="dot", width=1),
                 opacity=0.55, name=f"{ch} Strike",
-                legendgroup=ch, showlegend=False,             # <- rides the char toggle
+                legendgroup=ch, showlegend=False,
                 hovertemplate=f"{ch} Strike baseline: %{{y:.1%}}<extra></extra>"))
 
     fig.add_vline(x=mx, line=dict(color="grey", dash="dash", width=1))
@@ -108,7 +109,7 @@ def fig_daily(min_runs=5):
     for c in ["runs","wins","winrate"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
     df["day"] = pd.to_datetime(df["day"])
-    df = df[df.runs >= min_runs]                 # drop thin days that are pure noise
+    df = df[df.runs >= min_runs]
     fig = go.Figure()
     for full in ORDER:
         s = df[df.character == full].sort_values("day")
@@ -126,54 +127,38 @@ def fig_daily(min_runs=5):
         yaxis=dict(title="winrate", tickformat=".0%"),
         legend=dict(title="Character (click to toggle)"))
     return fig
-    
-def fig_survival():
-    df = fetch("floor_survival")
-    for c in ["min_floor_reached", "frac_surviving", "total_runs"]:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    totals = df.groupby("character")["total_runs"].first()
-    fig = go.Figure()
-    for full in ORDER:
-        s = df[df.character == full].sort_values("min_floor_reached")
-        if s.empty:
-            continue
-        ch = full.split("-")[0]
-        fig.add_trace(go.Scatter(
-            x=s.min_floor_reached, y=s.frac_surviving, mode="lines",
-            name=f"{full} (n={int(totals.get(full, 0))})",
-            line=dict(color=COLORS[ch], width=2),
-            hovertemplate=("floor ≥ %{x}<br>surviving %{y:.1%}"
-                           "<extra>"+full+"</extra>")))
-    fig.update_layout(template="plotly_white", autosize=True,
-        title="Fraction of runs surviving to each floor",
-        xaxis=dict(title="min floor reached"),
-        yaxis=dict(title="fraction surviving", tickformat=".0%"),
-        legend=dict(title="Character (click to toggle)"))
-    return fig
 
-# ================= stitch into a tabbed page =================
+# ================= tabs =================
 TABS = [
-    ("cards",     "Card explorer",      fig_cards),
+    ("cards",     "Card explorer",       fig_cards),
     ("ascension", "Winrate × ascension", fig_ascension),
-    ("daily",     "Winrate × day",      fig_daily),
-    ("survival",  "Floor survival",      fig_survival),
+    ("daily",     "Winrate × day",       fig_daily),
 ]
 
 def build():
-    updated = pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-    buttons, panels = [], []
-    for i, (tid, label, fn) in enumerate(TABS):
-        first = (i == 0)
-        div = pio.to_html(fn(), include_plotlyjs=("cdn" if first else False),
+    updated = pd.Timestamp.now("UTC").strftime("%Y-%m-%d %H:%M UTC")
+    buttons, panels, first_ok = [], [], True
+    for tid, label, fn in TABS:
+        try:
+            figure = fn()
+        except Exception as e:
+            print(f"skipping tab '{tid}': {e}")
+            continue
+        div = pio.to_html(figure,
+                          include_plotlyjs=("cdn" if first_ok else False),
                           full_html=False, div_id=f"plot-{tid}",
                           default_height="88vh",
                           config={"scrollZoom": True, "responsive": True})
         buttons.append(
-            f'<button class="tab-btn{" active" if first else ""}" '
+            f'<button class="tab-btn{" active" if first_ok else ""}" '
             f'onclick="showTab(\'{tid}\',this)">{label}</button>')
         panels.append(
             f'<div id="{tid}" class="tab-content"'
-            f'{"" if first else " style=\"display:none\""}>{div}</div>')
+            f'{"" if first_ok else " style=\"display:none\""}>{div}</div>')
+        first_ok = False
+
+    if not panels:
+        raise SystemExit("no tabs built — every view failed to fetch")
 
     html = f"""<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
