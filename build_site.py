@@ -30,41 +30,46 @@ def char_of(card):
     return p if p in set(CHAR_ORDER) else "COLORLESS"
 
 # ================= PLOT 1: card explorer (+ Strike baseline) =================
-def fig_cards():
+def _fig_cards(winrate_col, runs_col, title_suffix):
     df = fetch("card_stats")
-    for c in ["times_offered","offered_3c","runs_with_card","deck_winrate","pick_rate_3c"]:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
+    numeric = ["times_offered","offered_3c","runs_with_card","deck_winrate","pick_rate_3c",
+               "sp_runs_with_card","sp_deck_winrate","mp_runs_with_card","mp_deck_winrate"]
+    for c in numeric:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
     df["character"] = df["card"].map(char_of)
     df["short"] = df["card"].str.split("-", n=1).str[-1]
 
+    # Strike baseline uses the SAME winrate column as the plot, so the line matches
     strike_rows = df[df["short"].str.startswith("STRIKE", na=False)
                      & df["times_offered"].isna()].copy()
-    strike = (strike_rows.sort_values("runs_with_card", ascending=False)
-                         .groupby("character")["deck_winrate"].first())
-    print("strike baselines:", strike.to_dict())   # shows in the Action log
+    strike = (strike_rows.sort_values(runs_col, ascending=False)
+                         .groupby("character")[winrate_col].first())
 
-    s_df = df[(df.offered_3c >= 20) & (df.runs_with_card >= 20)
-              & df.pick_rate_3c.notna() & df.deck_winrate.notna()].copy()
+    # gate on the mode-specific run count so sparse MP cards drop out
+    s_df = df[(df.offered_3c >= 20) & (df[runs_col] >= 20)
+              & df.pick_rate_3c.notna() & df[winrate_col].notna()].copy()
     chars = [c for c in CHAR_ORDER if c in s_df.character.unique()]
-    mx, my = s_df.pick_rate_3c.median(), s_df.deck_winrate.median()
+    if s_df.empty:
+        raise ValueError(f"no cards clear the gate for {winrate_col}")
+    mx, my = s_df.pick_rate_3c.median(), s_df[winrate_col].median()
 
     fig = go.Figure()
     for ch in chars:
         s = s_df[s_df.character == ch]
         fig.add_trace(go.Scatter(
-            x=s.pick_rate_3c, y=s.deck_winrate, mode="markers+text",
+            x=s.pick_rate_3c, y=s[winrate_col], mode="markers+text",
             name=f"{ch} ({len(s)})", legendgroup=ch,
             marker=dict(size=(s.times_offered**0.5)*0.9, sizemin=3,
                         color=COLORS[ch], opacity=0.6, line=dict(width=0)),
             text=s.short, textposition="top center",
             textfont=dict(size=11, color=COLORS[ch]),
-            customdata=s[["short","times_offered","runs_with_card",
-                          "deck_winrate","pick_rate_3c"]].values,
+            customdata=s[["short","times_offered",runs_col,
+                          winrate_col,"pick_rate_3c"]].values,
             hovertemplate=("<b>%{customdata[0]}</b><br>pick 3c: %{customdata[4]:.1%}<br>"
                            "winrate: %{customdata[3]:.1%}<br>offered %{customdata[1]} · "
                            "runs %{customdata[2]}<extra>"+ch+"</extra>")))
 
-    # Strike baseline lines, one per character, toggled with the character
     for ch in chars:
         if ch in strike.index and pd.notna(strike[ch]):
             fig.add_trace(go.Scatter(
@@ -77,11 +82,15 @@ def fig_cards():
     fig.add_vline(x=mx, line=dict(color="grey", dash="dash", width=1))
     fig.add_hline(y=my, line=dict(color="grey", dash="dash", width=1))
     fig.update_layout(template="plotly_white", autosize=True,
-        title="Card draft-priority vs performance — dotted line = that character's Strike winrate",
+        title=f"Card draft-priority vs performance{title_suffix} — dotted line = Strike winrate",
         xaxis=dict(title="pick rate (3-card)", tickformat=".0%", range=[0,1], constrain="domain"),
         yaxis=dict(title="deck winrate", tickformat=".0%", range=[0,1], constrain="domain"),
         legend=dict(title="Character (click to toggle)"))
     return fig
+
+def fig_cards():     return _fig_cards("deck_winrate",    "runs_with_card",    "")
+def fig_cards_sp():  return _fig_cards("sp_deck_winrate", "sp_runs_with_card", " · singleplayer")
+def fig_cards_mp():  return _fig_cards("mp_deck_winrate", "mp_runs_with_card", " · multiplayer")
 
 # ================= PLOT 2: winrate over min ascension =================
 def fig_ascension():
@@ -157,10 +166,12 @@ def fig_survival():
     
 # ================= tabs =================
 TABS = [
-    ("cards",     "Card explorer",       fig_cards),
-    ("ascension", "Winrate × ascension", fig_ascension),
-    ("daily",     "Winrate × day",       fig_daily),
-    ("survival",  "Floor survival",      fig_survival),
+    ("cards",     "Card explorer",        fig_cards),
+    ("cards_sp",  "Cards · singleplayer", fig_cards_sp),
+    ("cards_mp",  "Cards · multiplayer",  fig_cards_mp),
+    ("ascension", "Winrate × ascension",  fig_ascension),
+    ("daily",     "Winrate × day",        fig_daily),
+    ("survival",  "Floor survival",       fig_survival),
 ]
 
 def build():
