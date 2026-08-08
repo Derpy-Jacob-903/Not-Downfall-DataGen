@@ -163,12 +163,60 @@ def fig_survival():
         yaxis=dict(title="fraction surviving", tickformat=".0%"),
         legend=dict(title="Character (click to toggle)"))
     return fig
+
+def fig_cards_sp_vs_mp(min_runs=20):
+    df = fetch("card_stats")
+    for c in ["sp_runs_with_card","sp_deck_winrate",
+              "mp_runs_with_card","mp_deck_winrate","times_offered"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+    df["character"] = df["card"].map(char_of)
+    df["short"] = df["card"].str.split("-", n=1).str[-1]
+
+    s = df[(df.sp_runs_with_card >= min_runs) & (df.mp_runs_with_card >= min_runs)
+           & df.sp_deck_winrate.notna() & df.mp_deck_winrate.notna()].copy()
+    if s.empty:
+        raise ValueError("no cards clear both SP and MP run gates")
+
+    # signed distance from the y=x diagonal: + = better in MP, - = better in SP
+    s["gap"] = s.mp_deck_winrate - s.sp_deck_winrate
+
+    fig = go.Figure()
+    for ch in CHAR_ORDER:
+        cs = s[s.character == ch]
+        if cs.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=cs.sp_deck_winrate, y=cs.mp_deck_winrate, mode="markers+text",
+            name=f"{ch} ({len(cs)})", legendgroup=ch,
+            marker=dict(size=8, color=COLORS[ch], opacity=0.65, line=dict(width=0)),
+            text=cs.short, textposition="top center", textfont=dict(size=9, color=COLORS[ch]),
+            customdata=cs[["short","sp_deck_winrate","mp_deck_winrate",
+                           "sp_runs_with_card","mp_runs_with_card","gap"]].values,
+            hovertemplate=("<b>%{customdata[0]}</b><br>"
+                           "SP %{customdata[1]:.1%} (n=%{customdata[3]})<br>"
+                           "MP %{customdata[2]:.1%} (n=%{customdata[4]})<br>"
+                           "gap %{customdata[5]:+.1%}<extra>"+ch+"</extra>")))
+
+    fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode="lines",
+                             line=dict(color="grey", dash="dash", width=1),
+                             name="equal", hoverinfo="skip", showlegend=False))
+    fig.update_layout(template="plotly_white", autosize=True,
+        title=f"Card winrate: singleplayer vs multiplayer (≥{min_runs} runs each · "
+              "above line = stronger in MP)",
+        xaxis=dict(title="singleplayer deck winrate", tickformat=".0%",
+                   range=[0,1], constrain="domain"),
+        yaxis=dict(title="multiplayer deck winrate", tickformat=".0%",
+                   range=[0,1], scaleanchor="x", scaleratio=1),
+        legend=dict(title="Character (click to toggle)"))
+    return fig
     
 # ================= tabs =================
 TABS = [
     ("cards",     "Card explorer",        fig_cards),
     ("cards_sp",  "Cards · singleplayer", fig_cards_sp),
     ("cards_mp",  "Cards · multiplayer",  fig_cards_mp),
+    ("cards_gap", "Cards · SP vs MP",     fig_cards_sp_vs_mp),
     ("ascension", "Winrate × ascension",  fig_ascension),
     ("daily",     "Winrate × day",        fig_daily),
     ("survival",  "Floor survival",       fig_survival),
