@@ -48,7 +48,7 @@ def _fig_cards(df, winrate_col, runs_col, title_suffix):
     strike = (strike_rows.sort_values(runs_col, ascending=False)
                          .groupby("character")[winrate_col].first())
 
-    s_df = df[(df.offered_3c >= 20) & (df[runs_col] >= 20)
+    s_df = df[(df.offered_3c >= 10) & (df[runs_col] >= 10)
               & df.pick_rate_3c.notna() & df[winrate_col].notna()].copy()
     if s_df.empty:
         raise ValueError(f"no cards clear the gate for {winrate_col}")
@@ -93,7 +93,7 @@ def fig_cards(df):    return _fig_cards(df, "deck_winrate",    "runs_with_card",
 def fig_cards_sp(df): return _fig_cards(df, "sp_deck_winrate", "sp_runs_with_card", " · singleplayer")
 def fig_cards_mp(df): return _fig_cards(df, "mp_deck_winrate", "mp_runs_with_card", " · multiplayer")
 
-def fig_cards_sp_vs_mp(df, min_runs=20):
+def fig_cards_sp_vs_mp(df, min_runs=10):
     s = df[(df.sp_runs_with_card >= min_runs) & (df.mp_runs_with_card >= min_runs)
            & df.sp_deck_winrate.notna() & df.mp_deck_winrate.notna()].copy()
     if s.empty:
