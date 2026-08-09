@@ -18,15 +18,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Refresh card_stats
+      - name: Refresh materialized views
         env:
-          SUPABASE_URL: https://wxememsxgrgrfvntulgr.supabase.co
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          curl -s -i -X POST "$SUPABASE_URL/rest/v1/rpc/refresh_card_stats" \
-            -H "apikey: $SUPABASE_SECRET_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SECRET_KEY" \
-            -H "Content-Type: application/json"
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "
+            refresh materialized view card_stats;
+            refresh materialized view character_stats;
+            refresh materialized view floor_survival;
+            refresh materialized view reload_map;
+            refresh materialized view relic_stats;
+          "
       - run: pip install requests pandas plotly
       - name: Generate site
         env:
