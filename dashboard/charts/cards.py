@@ -49,11 +49,14 @@ def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: 
     chars = [c for c in CHAR_ORDER if c in s_df.character.unique()]
     mx, my = s_df.pick_rate_3c.median(), s_df[winrate_col].median()
 
+    RARITIES = ["All", "Common", "Uncommon", "Rare"]
+
     fig = go.Figure()
+    # one trace per character (legend behaves exactly as before)
     for ch in chars:
         s = s_df[s_df.character == ch]
         base = COLORS[ch]
-        point_colors = [_shade(base, RARITY_SHADE.get(rar, 0.0)) for rar in s["rarity"]]
+        point_colors = [_shade(base, RARITY_SHADE.get(r, 0.0)) for r in s["rarity"]]
         symbols = s["rarity"].map(RARITY_SYMBOL).fillna("circle").tolist()
         fig.add_trace(go.Scatter(
             x=s.pick_rate_3c, y=s[winrate_col], mode="markers+text",
@@ -75,6 +78,33 @@ def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: 
             )
         ))
 
+    n_char_traces = len(chars)
+
+    # build the rarity dropdown: each option restyles x/y/text/marker of the char traces
+    buttons = []
+    for rar in RARITIES:
+        xs, ys, texts, colors, syms, cds = [], [], [], [], [], []
+        for ch in chars:
+            s = s_df[s_df.character == ch]
+            if rar != "All":
+                s = s[s["rarity"] == rar]
+            base = COLORS[ch]
+            xs.append(s.pick_rate_3c.tolist())
+            ys.append(s[winrate_col].tolist())
+            texts.append(s.label.tolist())
+            colors.append([_shade(base, RARITY_SHADE.get(r, 0.0)) for r in s["rarity"]])
+            syms.append(s["rarity"].map(RARITY_SYMBOL).fillna("circle").tolist())
+            cds.append(s[["label", "times_offered", runs_col, winrate_col,
+                          "pick_rate_3c", "rarity", "type", "cost", "description"]].values)
+        buttons.append(dict(
+            label=rar, method="restyle",
+            args=[{"x": xs, "y": ys, "text": texts,
+                   "marker.color": colors, "marker.symbol": syms,
+                   "customdata": cds},
+                  list(range(n_char_traces))]   # only touch the character traces
+        ))
+
+    # strike baselines (added AFTER, so the dropdown's trace-index list never touches them)
     for ch in chars:
         if ch in strike.index and pd.notna(strike[ch]):
             fig.add_trace(go.Scatter(
@@ -91,7 +121,15 @@ def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: 
         title=f"Card draft-priority vs performance{title_suffix} — dotted line = Strike winrate · shape = rarity",
         xaxis=dict(title="pick rate (3-card)", tickformat=".0%", range=[0, 1], constrain="domain"),
         yaxis=dict(title="deck winrate", tickformat=".0%", range=[0, 1], constrain="domain"),
-        legend=dict(title="Character (click to toggle)")
+        legend=dict(title="Character (click to toggle)"),
+        updatemenus=[dict(
+            buttons=buttons, direction="down", showactive=True,
+            x=1.0, xanchor="right", y=1.12, yanchor="top",
+            pad=dict(l=4, r=4, t=2, b=2),
+        )],
+        annotations=[dict(text="Rarity:", x=0.82, xref="paper",
+                          y=1.11, yref="paper", showarrow=False,
+                          xanchor="right", yanchor="top")],
     )
     return fig
 
