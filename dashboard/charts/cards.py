@@ -3,6 +3,41 @@ import plotly.graph_objects as go
 from config import CHAR_ORDER, COLORS
 
 
+def _shade(hex_color: str, factor: float) -> str:
+    """factor > 0 lightens toward white, < 0 darkens toward black."""
+    h = hex_color.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    if factor >= 0:
+        r = r + (255 - r) * factor
+        g = g + (255 - g) * factor
+        b = b + (255 - b) * factor
+    else:
+        f = 1 + factor
+        r, g, b = r * f, g * f, b * f
+    return f"#{int(r):02X}{int(g):02X}{int(b):02X}"
+
+
+RARITY_SHADE = {
+    "Basic":    0.35,
+    "Common":   0.22,
+    "Uncommon": 0.0,
+    "Rare":    -0.28,
+    "Token":    0.22,
+    "Ancient": -0.28,
+}
+
+RARITY_SYMBOL = {
+    "Basic":    "circle-open",
+    "Common":   "circle",
+    "Uncommon": "diamond",
+    "Rare":     "star",
+    "Token":    "cross",
+    "Ancient":  "hexagram",
+}
+
+MARKER_SIZE = 12   # <- single size knob for the card scatter
+
+
 def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: str) -> go.Figure:
     strike_rows = df[df["short"].str.startswith("STRIKE", na=False) & df["times_offered"].isna()].copy()
     strike = strike_rows.sort_values(runs_col, ascending=False).groupby("character")[winrate_col].first()
@@ -17,17 +52,26 @@ def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: 
     fig = go.Figure()
     for ch in chars:
         s = s_df[s_df.character == ch]
+        base = COLORS[ch]
+        point_colors = [_shade(base, RARITY_SHADE.get(rar, 0.0)) for rar in s["rarity"]]
+        symbols = s["rarity"].map(RARITY_SYMBOL).fillna("circle").tolist()
         fig.add_trace(go.Scatter(
             x=s.pick_rate_3c, y=s[winrate_col], mode="markers+text",
             name=f"{ch} ({len(s)})", legendgroup=ch,
-            marker=dict(size=(s.times_offered**0.5) * 0.9, sizemin=3, color=COLORS[ch], opacity=0.6, line=dict(width=0)),
-            text=s.short, textposition="top center",
-            textfont=dict(size=11, color=COLORS[ch]),
-            customdata=s[["short", "times_offered", runs_col, winrate_col, "pick_rate_3c"]].values,
+            marker=dict(size=MARKER_SIZE, sizemode="diameter",
+                        color=point_colors, opacity=0.6,
+                        symbol=symbols, line=dict(width=1.5, color=point_colors)),
+            text=s.label, textposition="top center",
+            textfont=dict(size=11, color=base),
+            customdata=s[["label", "times_offered", runs_col, winrate_col,
+                          "pick_rate_3c", "rarity", "type", "cost", "description"]].values,
             hovertemplate=(
-                "<b>%{customdata[0]}</b><br>pick 3c: %{customdata[4]:.1%}<br>"
-                "winrate: %{customdata[3]:.1%}<br>offered %{customdata[1]} · "
-                f"runs %{{customdata[2]}}<extra>{ch}</extra>"
+                "<b>%{customdata[0]}</b> · %{customdata[5]} %{customdata[6]} · %{customdata[7]} energy<br>"
+                "pick 3c: %{customdata[4]:.1%}<br>"
+                "winrate: %{customdata[3]:.1%}<br>"
+                "offered %{customdata[1]} · runs %{customdata[2]}<br>"
+                "<i>%{customdata[8]}</i>"
+                f"<extra>{ch}</extra>"
             )
         ))
 
@@ -44,7 +88,7 @@ def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: 
     fig.add_hline(y=my, line=dict(color="grey", dash="dash", width=1))
     fig.update_layout(
         template="plotly_white", autosize=True,
-        title=f"Card draft-priority vs performance{title_suffix} — dotted line = Strike winrate",
+        title=f"Card draft-priority vs performance{title_suffix} — dotted line = Strike winrate · shape = rarity",
         xaxis=dict(title="pick rate (3-card)", tickformat=".0%", range=[0, 1], constrain="domain"),
         yaxis=dict(title="deck winrate", tickformat=".0%", range=[0, 1], constrain="domain"),
         legend=dict(title="Character (click to toggle)")
@@ -80,8 +124,8 @@ def fig_cards_sp_vs_mp(df: pd.DataFrame, min_runs: int = 10) -> go.Figure:
             x=cs.sp_deck_winrate, y=cs.mp_deck_winrate, mode="markers+text",
             name=f"{ch} ({len(cs)})", legendgroup=ch,
             marker=dict(size=8, color=COLORS[ch], opacity=0.65, line=dict(width=0)),
-            text=cs.short, textposition="top center", textfont=dict(size=9, color=COLORS[ch]),
-            customdata=cs[["short", "sp_deck_winrate", "mp_deck_winrate", "sp_runs_with_card", "mp_runs_with_card", "gap"]].values,
+            text=cs.label, textposition="top center", textfont=dict(size=9, color=COLORS[ch]),
+            customdata=cs[["label", "sp_deck_winrate", "mp_deck_winrate", "sp_runs_with_card", "mp_runs_with_card", "gap"]].values,
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br>"
                 "SP %{customdata[1]:.1%} (n=%{customdata[3]})<br>"
