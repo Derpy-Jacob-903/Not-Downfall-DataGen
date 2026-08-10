@@ -1,0 +1,103 @@
+import pandas as pd
+import plotly.graph_objects as go
+from config import CHAR_ORDER, COLORS
+
+
+def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: str) -> go.Figure:
+    strike_rows = df[df["short"].str.startswith("STRIKE", na=False) & df["times_offered"].isna()].copy()
+    strike = strike_rows.sort_values(runs_col, ascending=False).groupby("character")[winrate_col].first()
+
+    s_df = df[(df.offered_3c >= 10) & (df[runs_col] >= 10) & df.pick_rate_3c.notna() & df[winrate_col].notna()].copy()
+    if s_df.empty:
+        raise ValueError(f"No cards clear the gate for {winrate_col}")
+
+    chars = [c for c in CHAR_ORDER if c in s_df.character.unique()]
+    mx, my = s_df.pick_rate_3c.median(), s_df[winrate_col].median()
+
+    fig = go.Figure()
+    for ch in chars:
+        s = s_df[s_df.character == ch]
+        fig.add_trace(go.Scatter(
+            x=s.pick_rate_3c, y=s[winrate_col], mode="markers+text",
+            name=f"{ch} ({len(s)})", legendgroup=ch,
+            marker=dict(size=(s.times_offered**0.5) * 0.9, sizemin=3, color=COLORS[ch], opacity=0.6, line=dict(width=0)),
+            text=s.short, textposition="top center",
+            textfont=dict(size=11, color=COLORS[ch]),
+            customdata=s[["short", "times_offered", runs_col, winrate_col, "pick_rate_3c"]].values,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>pick 3c: %{customdata[4]:.1%}<br>"
+                "winrate: %{customdata[3]:.1%}<br>offered %{customdata[1]} · "
+                f"runs %{{customdata[2]}}<extra>{ch}</extra>"
+            )
+        ))
+
+    for ch in chars:
+        if ch in strike.index and pd.notna(strike[ch]):
+            fig.add_trace(go.Scatter(
+                x=[0, 1], y=[strike[ch], strike[ch]], mode="lines",
+                line=dict(color=COLORS[ch], dash="dot", width=1.5), opacity=0.6,
+                legendgroup=ch, showlegend=False,
+                hovertemplate=f"{ch} Strike baseline: %{{y:.1%}}<extra></extra>"
+            ))
+
+    fig.add_vline(x=mx, line=dict(color="grey", dash="dash", width=1))
+    fig.add_hline(y=my, line=dict(color="grey", dash="dash", width=1))
+    fig.update_layout(
+        template="plotly_white", autosize=True,
+        title=f"Card draft-priority vs performance{title_suffix} — dotted line = Strike winrate",
+        xaxis=dict(title="pick rate (3-card)", tickformat=".0%", range=[0, 1], constrain="domain"),
+        yaxis=dict(title="deck winrate", tickformat=".0%", range=[0, 1], constrain="domain"),
+        legend=dict(title="Character (click to toggle)")
+    )
+    return fig
+
+
+def fig_cards(df: pd.DataFrame) -> go.Figure:
+    return _fig_cards(df, "deck_winrate", "runs_with_card", "")
+
+
+def fig_cards_sp(df: pd.DataFrame) -> go.Figure:
+    return _fig_cards(df, "sp_deck_winrate", "sp_runs_with_card", " · singleplayer")
+
+
+def fig_cards_mp(df: pd.DataFrame) -> go.Figure:
+    return _fig_cards(df, "mp_deck_winrate", "mp_runs_with_card", " · multiplayer")
+
+
+def fig_cards_sp_vs_mp(df: pd.DataFrame, min_runs: int = 10) -> go.Figure:
+    s = df[(df.sp_runs_with_card >= min_runs) & (df.mp_runs_with_card >= min_runs)
+           & df.sp_deck_winrate.notna() & df.mp_deck_winrate.notna()].copy()
+    if s.empty:
+        raise ValueError("No cards clear both SP and MP run gates")
+    s["gap"] = s.mp_deck_winrate - s.sp_deck_winrate
+
+    fig = go.Figure()
+    for ch in CHAR_ORDER:
+        cs = s[s.character == ch]
+        if cs.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=cs.sp_deck_winrate, y=cs.mp_deck_winrate, mode="markers+text",
+            name=f"{ch} ({len(cs)})", legendgroup=ch,
+            marker=dict(size=8, color=COLORS[ch], opacity=0.65, line=dict(width=0)),
+            text=cs.short, textposition="top center", textfont=dict(size=9, color=COLORS[ch]),
+            customdata=cs[["short", "sp_deck_winrate", "mp_deck_winrate", "sp_runs_with_card", "mp_runs_with_card", "gap"]].values,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "SP %{customdata[1]:.1%} (n=%{customdata[3]})<br>"
+                "MP %{customdata[2]:.1%} (n=%{customdata[4]})<br>"
+                f"gap %{{customdata[5]:+.1%}}<extra>{ch}</extra>"
+            )
+        ))
+    fig.add_trace(go.Scatter(
+        x=[0, 1], y=[0, 1], mode="lines",
+        line=dict(color="grey", dash="dash", width=1), name="equal", hoverinfo="skip", showlegend=False
+    ))
+    fig.update_layout(
+        template="plotly_white", autosize=True,
+        title=f"Card winrate: singleplayer vs multiplayer (≥{min_runs} runs each · above line = stronger in MP)",
+        xaxis=dict(title="singleplayer deck winrate", tickformat=".0%", range=[0, 1], constrain="domain"),
+        yaxis=dict(title="multiplayer deck winrate", tickformat=".0%", range=[0, 1], scaleanchor="x", scaleratio=1),
+        legend=dict(title="Character (click to toggle)")
+    )
+    return fig

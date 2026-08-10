@@ -37,7 +37,7 @@ jobs:
       - name: Generate site
         env:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-        run: python build_site.py
+        run: python dashboard/build.py
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
