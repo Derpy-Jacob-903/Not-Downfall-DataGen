@@ -52,6 +52,41 @@ def load_items_base() -> pd.DataFrame:
     return _load_items_slice("Slay the Spire 2")
 
 
+def _fetch_metrics(bracket: str | None = None) -> pd.DataFrame:
+    """Base-game card metrics from Spire Codex for one bracket (unupgraded)."""
+    params = {}
+    if bracket:
+        params["bracket"] = bracket
+    try:
+        data = requests.get("https://spire-codex.com/api/runs/metrics/cards",
+                            params=params, timeout=30).json()
+    except Exception as e:
+        print(f"vanilla metrics fetch failed ({bracket}): {e}")
+        return pd.DataFrame()
+    v = pd.DataFrame(data.get("rows", []))
+    if v.empty:
+        return v
+    v = v[v["upgraded"] == False].copy()
+    v["win_rate"] = pd.to_numeric(v["win_rate"], errors="coerce") / 100.0
+    return v[["id", "win_rate", "picks"]]
+
+
+def _pooled_mp() -> pd.DataFrame:
+    """Pool 2p + 3p + 4p into one run-weighted multiplayer winrate per card."""
+    frames = []
+    for b in ["2p", "3p", "4p"]:
+        f = _fetch_metrics(b)
+        if not f.empty:
+            f = f.rename(columns={"win_rate": "wr", "picks": "n"})
+            frames.append(f)
+    if not frames:
+        return pd.DataFrame(columns=["id", "mp_win_rate", "mp_picks"])
+    allmp = pd.concat(frames, ignore_index=True)
+    allmp["wins"] = allmp["wr"] * allmp["n"]
+    g = allmp.groupby("id").agg(wins=("wins", "sum"), n=("n", "sum")).reset_index()
+    g["mp_win_rate"] = g["wins"] / g["n"]
+    return g.rename(columns={"n": "mp_picks"})[["id", "mp_win_rate", "mp_picks"]]
+
 def load_vanilla(min_picks: int = 5000) -> pd.DataFrame:
     """Base-game card metrics (Spire Codex) + rarity/name/text/color from items.json, as reference points."""
     try:
@@ -65,6 +100,14 @@ def load_vanilla(min_picks: int = 5000) -> pd.DataFrame:
     v["pick_rate"] = pd.to_numeric(v["pick_rate"], errors="coerce") / 100.0
     v = v[v["picks"] >= min_picks]
     v = v[["id", "win_rate", "pick_rate", "tier", "picks"]]
+
+    # SP and pooled-MP winrates
+    sp = _fetch_metrics("solo").rename(columns={"win_rate": "sp_win_rate", "picks": "sp_picks"})
+    mp = _pooled_mp()
+    if not sp.empty:
+        v = v.merge(sp, on="id", how="left")
+    if not mp.empty:
+        v = v.merge(mp, on="id", how="left")
 
     meta = load_items_base()
     v = v.merge(meta, on="id", how="left")

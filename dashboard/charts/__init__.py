@@ -31,7 +31,7 @@ def get_tabs() -> list[TabDefinition]:
             TabDefinition("cards", "Card explorer", lambda: fig_cards(cards_df.copy(), vanilla_df)),
             TabDefinition("cards_sp", "Cards - singleplayer", lambda: fig_cards_sp(cards_df.copy(), vanilla_df)),
             TabDefinition("cards_mp", "Cards - multiplayer", lambda: fig_cards_mp(cards_df.copy(), vanilla_df)),
-            TabDefinition("cards_gap", "Cards - SP vs MP", lambda: fig_cards_sp_vs_mp(cards_df.copy())),
+            TabDefinition("cards_gap", "Cards - SP vs MP", lambda: fig_cards_sp_vs_mp(cards_df.copy(), vanilla=vanilla_df)),
         ])
     tabs.extend([
         TabDefinition("ascension", "Winrate x ascension", fig_ascension),
