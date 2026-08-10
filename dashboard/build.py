@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import plotly.io as pio
+import traceback
 
 from charts import get_tabs
 from template import render_html
@@ -16,6 +17,7 @@ def build():
             figure = tab.builder()
         except Exception as e:
             print(f"Skipping tab '{tab.id}': {e}")
+            traceback.print_exc()
             continue
 
         div = pio.to_html(

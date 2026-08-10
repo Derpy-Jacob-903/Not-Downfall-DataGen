@@ -13,27 +13,24 @@ VANILLA_CHAR_COLORS = {
 }
 
 
-def fig_ascension() -> go.Figure:
-    df = fetch("character_stats")
-    for c in ["min_ascension", "total_min_winrate", "total_cum_runs"]:
+def _fig_ascension(df, winrate_col, runs_col, van_cumulative, title, x_label):
+    for c in ["min_ascension", winrate_col, runs_col]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
     fig = go.Figure()
-    # Downfall characters (solid)
     for full in ORDER:
         s = df[df.character == full].sort_values("min_ascension")
         if s.empty:
             continue
         ch = full.split("-")[0]
         fig.add_trace(go.Scatter(
-            x=s.min_ascension, y=s.total_min_winrate, mode="lines+markers",
+            x=s.min_ascension, y=s[winrate_col], mode="lines+markers",
             name=full, line=dict(color=COLORS[ch], width=2),
-            customdata=s[["total_cum_runs"]].values,
-            hovertemplate=f"asc ≥ %{{x}}<br>winrate %{{y:.1%}}<br>n=%{{customdata[0]}}<extra>{full}</extra>"
+            customdata=s[[runs_col]].values,
+            hovertemplate=f"{x_label} %{{x}}<br>winrate %{{y:.1%}}<br>n=%{{customdata[0]}}<extra>{full}</extra>"
         ))
 
-    # base-game reference (dotted, thinner) — cumulative to match "≥ X"
-    van = load_vanilla_ascension(cumulative=True)
+    van = load_vanilla_ascension(cumulative=van_cumulative)
     for cid, color in VANILLA_CHAR_COLORS.items():
         s = van[van["character"] == cid].sort_values("ascension")
         if s.empty:
@@ -43,17 +40,35 @@ def fig_ascension() -> go.Figure:
             name=f"base: {cid}", line=dict(color=color, width=1.5, dash="dot"),
             opacity=0.7, legendgroup="vanilla",
             customdata=s[["runs"]].values,
-            hovertemplate=f"asc ≥ %{{x}}<br>winrate %{{y:.1%}}<br>n=%{{customdata[0]}}<extra>base: {cid}</extra>"
+            hovertemplate=f"{x_label} %{{x}}<br>winrate %{{y:.1%}}<br>n=%{{customdata[0]}}<extra>base: {cid}</extra>"
         ))
 
     fig.update_layout(
         template="plotly_white", autosize=True,
-        title="Cumulative winrate at ascension ≥ X — solid = Downfall · dotted = base game",
-        xaxis=dict(title="ascension floor (≥)", dtick=1),
+        title=title,
+        xaxis=dict(title="ascension", dtick=1),
         yaxis=dict(title="winrate", tickformat=".0%"),
         legend=dict(title="Character (click to toggle)")
     )
     return fig
+
+
+def fig_ascension() -> go.Figure:
+    return _fig_ascension(
+        fetch("character_stats"),
+        winrate_col="total_winrate", runs_col="total_runs",
+        van_cumulative=False,
+        title="Winrate at each ascension — solid = Downfall · dotted = base game",
+        x_label="asc")
+
+
+def fig_ascension_cum() -> go.Figure:
+    return _fig_ascension(
+        fetch("character_stats"),
+        winrate_col="total_min_winrate", runs_col="total_cum_runs",
+        van_cumulative=True,
+        title="Cumulative winrate at ascension ≥ X — solid = Downfall · dotted = base game",
+        x_label="asc ≥")
 
 
 def fig_daily(min_runs: int = 5) -> go.Figure:

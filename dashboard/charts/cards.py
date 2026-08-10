@@ -203,8 +203,7 @@ def fig_cards_mp(df: pd.DataFrame, vanilla=None) -> go.Figure:
 def fig_cards_sp_vs_mp(df: pd.DataFrame, min_runs: int = 10, vanilla=None) -> go.Figure:
     s = df[(df.sp_runs_with_card >= min_runs) & (df.mp_runs_with_card >= min_runs)
            & df.sp_deck_winrate.notna() & df.mp_deck_winrate.notna()].copy()
-    if s.empty:
-        raise ValueError("No cards clear both SP and MP run gates")
+    s = s.reset_index(drop=True)
     s["gap"] = s.mp_deck_winrate - s.sp_deck_winrate
 
     fig = go.Figure()

@@ -4,9 +4,9 @@ import plotly.graph_objects as go
 
 from data import prep_cards, load_vanilla
 from .cards import fig_cards, fig_cards_sp, fig_cards_mp, fig_cards_sp_vs_mp
-from .character import fig_ascension, fig_daily, fig_survival
+from .character import fig_ascension, fig_ascension_cum, fig_daily, fig_survival
 from .relics import fig_relics
-
+import traceback
 
 @dataclass
 class TabDefinition:
@@ -21,20 +21,21 @@ def get_tabs() -> list[TabDefinition]:
         cards_df = prep_cards()
     except Exception as e:
         print(f"card_stats fetch failed, all card tabs skipped: {e}")
+        traceback.print_exc()
         cards_df = None
     vanilla_df = load_vanilla()
     tabs = []
 
     if cards_df is not None:
         tabs.extend([
-            TabDefinition("cards", "Card explorer", lambda: fig_cards(cards_df, vanilla_df)),
-            TabDefinition("cards_sp", "Cards - singleplayer", lambda: fig_cards_sp(cards_df, vanilla_df)),
-            TabDefinition("cards_mp", "Cards - multiplayer", lambda: fig_cards_mp(cards_df, vanilla_df)),
-            TabDefinition("cards_gap", "Cards - SP vs MP", lambda: fig_cards_sp_vs_mp(cards_df, vanilla_df)),
+            TabDefinition("cards", "Card explorer", lambda: fig_cards(cards_df.copy(), vanilla_df)),
+            TabDefinition("cards_sp", "Cards - singleplayer", lambda: fig_cards_sp(cards_df.copy(), vanilla_df)),
+            TabDefinition("cards_mp", "Cards - multiplayer", lambda: fig_cards_mp(cards_df.copy(), vanilla_df)),
+            TabDefinition("cards_gap", "Cards - SP vs MP", lambda: fig_cards_sp_vs_mp(cards_df.copy())),
         ])
-
     tabs.extend([
         TabDefinition("ascension", "Winrate x ascension", fig_ascension),
+        TabDefinition("ascension_cum", "Winrate x ascension (cum)", fig_ascension_cum),
         TabDefinition("daily", "Winrate x day", fig_daily),
         TabDefinition("survival", "Floor survival", fig_survival),
         TabDefinition("relics", "Relic winrate", fig_relics),

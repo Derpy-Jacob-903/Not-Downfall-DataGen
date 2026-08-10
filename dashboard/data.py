@@ -75,8 +75,7 @@ def load_vanilla(min_picks: int = 5000) -> pd.DataFrame:
     v["color"] = v["color"].fillna("unknown")
     return v
 
-def load_vanilla_ascension(cumulative: bool = True) -> pd.DataFrame:
-    """Base-game character winrate by ascension (Spire Codex charts)."""
+def load_vanilla_ascension(cumulative: bool = False) -> pd.DataFrame:
     try:
         c = requests.get("https://spire-codex.com/api/charts/winrate-by-ascension",
                          params={"split": "character"}, timeout=30).json()
@@ -118,6 +117,7 @@ def prep_cards() -> pd.DataFrame:
 
     items = load_items()
     df = df.merge(items, left_on="card", right_on="id", how="left")
+    df = df.reset_index(drop=True)          # <- add this
     df = df.drop(columns=["id"], errors="ignore")
     df = df.loc[:, ~df.columns.duplicated()]
     df["description"] = df["description"].str.replace("\n", "<br>", regex=False)
