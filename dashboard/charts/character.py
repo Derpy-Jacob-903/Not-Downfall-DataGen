@@ -1,7 +1,16 @@
 import pandas as pd
 import plotly.graph_objects as go
 from config import ORDER, COLORS
-from data import fetch
+from data import fetch, load_vanilla_ascension
+
+
+VANILLA_CHAR_COLORS = {
+    "ironclad":    "#D62000",
+    "silent":      "#5EBD00",
+    "defect":      "#3EB3ED",
+    "necrobinder": "#CD4EED",
+    "regent":      "#E36600",
+}
 
 
 def fig_ascension() -> go.Figure:
@@ -10,6 +19,7 @@ def fig_ascension() -> go.Figure:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
     fig = go.Figure()
+    # Downfall characters (solid)
     for full in ORDER:
         s = df[df.character == full].sort_values("min_ascension")
         if s.empty:
@@ -21,9 +31,24 @@ def fig_ascension() -> go.Figure:
             customdata=s[["total_cum_runs"]].values,
             hovertemplate=f"asc ≥ %{{x}}<br>winrate %{{y:.1%}}<br>n=%{{customdata[0]}}<extra>{full}</extra>"
         ))
+
+    # base-game reference (dotted, thinner) — cumulative to match "≥ X"
+    van = load_vanilla_ascension(cumulative=True)
+    for cid, color in VANILLA_CHAR_COLORS.items():
+        s = van[van["character"] == cid].sort_values("ascension")
+        if s.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=s["ascension"], y=s["winrate"], mode="lines",
+            name=f"base: {cid}", line=dict(color=color, width=1.5, dash="dot"),
+            opacity=0.7, legendgroup="vanilla",
+            customdata=s[["runs"]].values,
+            hovertemplate=f"asc ≥ %{{x}}<br>winrate %{{y:.1%}}<br>n=%{{customdata[0]}}<extra>base: {cid}</extra>"
+        ))
+
     fig.update_layout(
         template="plotly_white", autosize=True,
-        title="Cumulative winrate at ascension ≥ X",
+        title="Cumulative winrate at ascension ≥ X — solid = Downfall · dotted = base game",
         xaxis=dict(title="ascension floor (≥)", dtick=1),
         yaxis=dict(title="winrate", tickformat=".0%"),
         legend=dict(title="Character (click to toggle)")

@@ -35,10 +35,25 @@ RARITY_SYMBOL = {
     "Ancient":  "hexagram",
 }
 
+# base-game pool colors (from Spire Codex DeckEntryCardColor)
+VANILLA_COLORS = {
+    "ironclad":    "#D62000",
+    "silent":      "#5EBD00",
+    "defect":      "#3EB3ED",
+    "necrobinder": "#CD4EED",
+    "regent":      "#E36600",
+    "colorless":   "#A3A3A3",
+    "curse":       "#585B61",
+    "status":      "#9C9C9C",
+    "unknown":     "#999999",
+}
+VANILLA_ORDER = ["ironclad", "silent", "defect", "necrobinder", "regent",
+                 "colorless", "curse", "status", "unknown"]
+
 MARKER_SIZE = 12   # <- single size knob for the card scatter
 
 
-def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: str) -> go.Figure:
+def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: str, vanilla=None) -> go.Figure:
     strike_rows = df[df["short"].str.startswith("STRIKE", na=False) & df["times_offered"].isna()].copy()
     strike = strike_rows.sort_values(runs_col, ascending=False).groupby("character")[winrate_col].first()
 
@@ -52,7 +67,6 @@ def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: 
     RARITIES = ["All", "Common", "Uncommon", "Rare"]
 
     fig = go.Figure()
-    # one trace per character (legend behaves exactly as before)
     for ch in chars:
         s = s_df[s_df.character == ch]
         base = COLORS[ch]
@@ -79,8 +93,18 @@ def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: 
         ))
 
     n_char_traces = len(chars)
+    n_strike = sum(1 for ch in chars if ch in strike.index and pd.notna(strike[ch]))
 
-    # build the rarity dropdown: each option restyles x/y/text/marker of the char traces
+    # which base-game colors are actually present, in order
+    van_colors = []
+    if vanilla is not None and not vanilla.empty:
+        present = set(vanilla["color"].unique())
+        van_colors = [c for c in VANILLA_ORDER if c in present]
+
+    # base-game trace indices come after char traces + strike lines
+    van_indices = {col: n_char_traces + n_strike + i for i, col in enumerate(van_colors)}
+
+    # ---- rarity dropdown: filter char traces AND every base-game trace ----
     buttons = []
     for rar in RARITIES:
         xs, ys, texts, colors, syms, cds = [], [], [], [], [], []
@@ -96,15 +120,26 @@ def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: 
             syms.append(s["rarity"].map(RARITY_SYMBOL).fillna("circle").tolist())
             cds.append(s[["label", "times_offered", runs_col, winrate_col,
                           "pick_rate_3c", "rarity", "type", "cost", "description"]].values)
-        buttons.append(dict(
-            label=rar, method="restyle",
-            args=[{"x": xs, "y": ys, "text": texts,
-                   "marker.color": colors, "marker.symbol": syms,
-                   "customdata": cds},
-                  list(range(n_char_traces))]   # only touch the character traces
-        ))
 
-    # strike baselines (added AFTER, so the dropdown's trace-index list never touches them)
+        prop = {"x": xs, "y": ys, "text": texts,
+                "marker.color": colors, "marker.symbol": syms, "customdata": cds}
+        target = list(range(n_char_traces))
+
+        for col in van_colors:
+            vc = vanilla[vanilla["color"] == col]
+            vf = vc if rar == "All" else vc[vc["rarity"] == rar]
+            prop["x"].append(vf.pick_rate.tolist())
+            prop["y"].append(vf.win_rate.tolist())
+            prop["text"].append([""] * len(vf))
+            prop["marker.color"].append([VANILLA_COLORS.get(col, "#999999")] * len(vf))
+            prop["marker.symbol"].append(vf["rarity"].map(RARITY_SYMBOL).fillna("x").tolist())
+            prop["customdata"].append(
+                vf[["label", "win_rate", "pick_rate", "tier", "picks", "rarity", "description"]].values)
+            target.append(van_indices[col])
+
+        buttons.append(dict(label=rar, method="restyle", args=[prop, target]))
+
+    # ---- strike baselines ----
     for ch in chars:
         if ch in strike.index and pd.notna(strike[ch]):
             fig.add_trace(go.Scatter(
@@ -113,6 +148,25 @@ def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: 
                 legendgroup=ch, showlegend=False,
                 hovertemplate=f"{ch} Strike baseline: %{{y:.1%}}<extra></extra>"
             ))
+
+    # ---- one base-game trace per color ----
+    for col in van_colors:
+        vc = vanilla[vanilla["color"] == col]
+        cval = VANILLA_COLORS.get(col, "#999999")
+        fig.add_trace(go.Scatter(
+            x=vc.pick_rate, y=vc.win_rate, mode="markers",
+            name=f"base: {col} ({len(vc)})", legendgroup=f"van_{col}",
+            marker=dict(size=6, color=cval, opacity=0.4,
+                        symbol=vc["rarity"].map(RARITY_SYMBOL).fillna("x").tolist(),
+                        line=dict(width=0)),
+            customdata=vc[["label", "win_rate", "pick_rate", "tier", "picks",
+                           "rarity", "description"]].values,
+            hovertemplate=("<b>%{customdata[0]}</b> · %{customdata[5]} (base: " + col + ")<br>"
+                                                                                        "winrate %{customdata[1]:.1%}<br>"
+                                                                                        "pick %{customdata[2]:.1%} · tier %{customdata[4]}<br>"
+                                                                                        "<i>%{customdata[6]}</i>"
+                                                                                        "<extra>base: " + col + "</extra>")
+        ))
 
     fig.add_vline(x=mx, line=dict(color="grey", dash="dash", width=1))
     fig.add_hline(y=my, line=dict(color="grey", dash="dash", width=1))
@@ -134,19 +188,19 @@ def _fig_cards(df: pd.DataFrame, winrate_col: str, runs_col: str, title_suffix: 
     return fig
 
 
-def fig_cards(df: pd.DataFrame) -> go.Figure:
-    return _fig_cards(df, "deck_winrate", "runs_with_card", "")
+def fig_cards(df: pd.DataFrame, vanilla=None) -> go.Figure:
+    return _fig_cards(df, "deck_winrate", "runs_with_card", "", vanilla)
 
 
-def fig_cards_sp(df: pd.DataFrame) -> go.Figure:
-    return _fig_cards(df, "sp_deck_winrate", "sp_runs_with_card", " · singleplayer")
+def fig_cards_sp(df: pd.DataFrame, vanilla=None) -> go.Figure:
+    return _fig_cards(df, "sp_deck_winrate", "sp_runs_with_card", " · singleplayer", vanilla)
 
 
-def fig_cards_mp(df: pd.DataFrame) -> go.Figure:
-    return _fig_cards(df, "mp_deck_winrate", "mp_runs_with_card", " · multiplayer")
+def fig_cards_mp(df: pd.DataFrame, vanilla=None) -> go.Figure:
+    return _fig_cards(df, "mp_deck_winrate", "mp_runs_with_card", " · multiplayer", vanilla)
 
 
-def fig_cards_sp_vs_mp(df: pd.DataFrame, min_runs: int = 10) -> go.Figure:
+def fig_cards_sp_vs_mp(df: pd.DataFrame, min_runs: int = 10, vanilla=None) -> go.Figure:
     s = df[(df.sp_runs_with_card >= min_runs) & (df.mp_runs_with_card >= min_runs)
            & df.sp_deck_winrate.notna() & df.mp_deck_winrate.notna()].copy()
     if s.empty:

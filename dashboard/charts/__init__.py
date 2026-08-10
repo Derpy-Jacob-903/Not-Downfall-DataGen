@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Callable
 import plotly.graph_objects as go
 
-from data import prep_cards
+from data import prep_cards, load_vanilla
 from .cards import fig_cards, fig_cards_sp, fig_cards_mp, fig_cards_sp_vs_mp
 from .character import fig_ascension, fig_daily, fig_survival
 from .relics import fig_relics
@@ -22,15 +22,15 @@ def get_tabs() -> list[TabDefinition]:
     except Exception as e:
         print(f"card_stats fetch failed, all card tabs skipped: {e}")
         cards_df = None
-
+    vanilla_df = load_vanilla()
     tabs = []
 
     if cards_df is not None:
         tabs.extend([
-            TabDefinition("cards", "Card explorer", lambda: fig_cards(cards_df)),
-            TabDefinition("cards_sp", "Cards - singleplayer", lambda: fig_cards_sp(cards_df)),
-            TabDefinition("cards_mp", "Cards - multiplayer", lambda: fig_cards_mp(cards_df)),
-            TabDefinition("cards_gap", "Cards - SP vs MP", lambda: fig_cards_sp_vs_mp(cards_df)),
+            TabDefinition("cards", "Card explorer", lambda: fig_cards(cards_df, vanilla_df)),
+            TabDefinition("cards_sp", "Cards - singleplayer", lambda: fig_cards_sp(cards_df, vanilla_df)),
+            TabDefinition("cards_mp", "Cards - multiplayer", lambda: fig_cards_mp(cards_df, vanilla_df)),
+            TabDefinition("cards_gap", "Cards - SP vs MP", lambda: fig_cards_sp_vs_mp(cards_df, vanilla_df)),
         ])
 
     tabs.extend([
