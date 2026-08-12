@@ -1,7 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 from config import ORDER, COLORS
-from data import fetch, load_vanilla_ascension
+from data import fetch, load_vanilla_ascension, load_vanilla_over_time
 
 
 VANILLA_CHAR_COLORS = {
@@ -90,6 +90,37 @@ def fig_daily(min_runs: int = 5) -> go.Figure:
             customdata=s[["runs"]].values,
             hovertemplate=f"%{{x|%Y-%m-%d}}<br>winrate %{{y:.1%}}<br>n=%{{customdata[0]}}<extra>{full}</extra>"
         ))
+    van = load_vanilla_over_time()
+    cutoff = df["day"].min() - pd.Timedelta(days=7)
+    van = van[van["week"] >= cutoff]
+
+    x_span = [df["day"].min(), df["day"].max()]  # span for drawing a lone week flat
+
+    for cid, color in VANILLA_CHAR_COLORS.items():
+        s = van[van["character"] == cid].sort_values("week")
+        if s.empty:
+            continue
+        if len(s) == 1:
+            # only one weekly point in range -> draw it as a flat reference line
+            wr = s["winrate"].iloc[0]
+            wk = s["week"].iloc[0]
+            fig.add_trace(go.Scatter(
+                x=x_span, y=[wr, wr], mode="lines",
+                name=f"base: {cid}", line=dict(color=color, width=1.5, dash="dot"),
+                opacity=0.7, legendgroup="vanilla",
+                hovertemplate=(f"week of {wk:%Y-%m-%d}<br>winrate {wr:.1%}"
+                               f"<extra>base: {cid}</extra>")
+            ))
+        else:
+            # two or more weeks -> normal connecting line
+            fig.add_trace(go.Scatter(
+                x=s.week, y=s.winrate, mode="lines",
+                name=f"base: {cid}", line=dict(color=color, width=1.5, dash="dot"),
+                opacity=0.7, legendgroup="vanilla",
+                customdata=s[["runs"]].values,
+                hovertemplate=("%{x|%Y-%m-%d}<br>winrate %{y:.1%}"
+                               "<br>n=%{customdata[0]}<extra>base: " + cid + "</extra>")
+            ))
     fig.update_layout(
         template="plotly_white", autosize=True,
         title=f"Daily winrate per character (days with ≥{min_runs} runs)",

@@ -166,3 +166,26 @@ def prep_cards() -> pd.DataFrame:
     df["description"] = df["description"].str.replace("\n", "<br>", regex=False)
     df["label"] = df["name"].fillna(df["short"])
     return df
+
+
+def load_vanilla_over_time() -> pd.DataFrame:
+    """Base-game WEEKLY win rate over time, per character (Spire Codex).
+
+    'frame' chart like winrate-by-ascension, so expected shape is
+    {"series":[{"id","points":[{"x","y","n"}]}]}, x a week, y a win %.
+    Buckets are weekly, not daily.
+    """
+    try:
+        c = requests.get("https://spire-codex.com/api/charts/winrate-over-time",
+                         params={"split": "character"}, timeout=30).json()
+    except Exception as e:
+        print(f"vanilla over-time fetch failed, skipping: {e}")
+        return pd.DataFrame()
+    rows = []
+    for series in c.get("series", []):
+        cid = series.get("id", "").lower()
+        for p in sorted(series.get("points", []), key=lambda p: p["x"]):
+            rows.append({"character": cid,
+                         "week": pd.to_datetime(p["x"], errors="coerce"),
+                         "winrate": p["y"] / 100.0, "runs": p.get("n")})
+    return pd.DataFrame(rows)
