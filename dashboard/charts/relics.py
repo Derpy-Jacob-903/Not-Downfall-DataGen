@@ -14,7 +14,7 @@ def fig_relics() -> go.Figure:
     df["short"] = df["relic"].str.split("-", n=1).str[-1]
     df["is_vanilla"] = df["character"] == "COLORLESS"
 
-    s = df[(df.runs_with_relic >= 20) & df.relic_winrate.notna()].copy()
+    s = df[df.relic_winrate.notna()].copy()
     if s.empty:
         raise ValueError("No relics clear the run gate")
 
@@ -44,7 +44,7 @@ def fig_relics() -> go.Figure:
 
     fig.update_layout(
         template="plotly_white", autosize=True,
-        title="Relic winrate vs sample size — vanilla (grey) vs character relics (≥20 runs)",
+        title="Relic winrate vs sample size — vanilla (grey) vs character relics",
         xaxis=dict(title="runs with relic", type="log"),
         yaxis=dict(title="winrate", tickformat=".0%", range=[0, 1]),
         legend=dict(title="Relic set (click to toggle)")
