@@ -189,22 +189,22 @@ def _fig_cards(df, winrate_col, runs_col, title_suffix, vanilla=None, van_wr_col
 
 
 def fig_cards(df, vanilla=None):
-    return _fig_cards(df, "deck_winrate", "runs_with_card", "", vanilla, van_wr_col="win_rate")
+    return _fig_cards(df, "acquired_winrate", "runs_acquired", "", vanilla, van_wr_col="win_rate")
 
 
 def fig_cards_sp(df, vanilla=None):
-    return _fig_cards(df, "sp_deck_winrate", "sp_runs_with_card", " · singleplayer", vanilla, van_wr_col="sp_win_rate")
+    return _fig_cards(df, "sp_acquired_winrate", "sp_runs_acquired", " · singleplayer", vanilla, van_wr_col="sp_win_rate")
 
 
 def fig_cards_mp(df, vanilla=None):
-    return _fig_cards(df, "mp_deck_winrate", "mp_runs_with_card", " · multiplayer", vanilla, van_wr_col="mp_win_rate")
+    return _fig_cards(df, "mp_acquired_winrate", "mp_runs_acquired", " · multiplayer", vanilla, van_wr_col="mp_win_rate")
 
 
 def fig_cards_sp_vs_mp(df: pd.DataFrame, min_runs: int = 10, vanilla=None) -> go.Figure:
-    s = df[(df.sp_runs_with_card >= min_runs) & (df.mp_runs_with_card >= min_runs)
-           & df.sp_deck_winrate.notna() & df.mp_deck_winrate.notna()].copy()
+    s = df[(df.sp_runs_acquired >= min_runs) & (df.mp_runs_acquired >= min_runs)
+           & df.sp_acquired_winrate.notna() & df.mp_acquired_winrate.notna()].copy()
     s = s.reset_index(drop=True)
-    s["gap"] = s.mp_deck_winrate - s.sp_deck_winrate
+    s["gap"] = s.mp_acquired_winrate - s.sp_acquired_winrate
 
     fig = go.Figure()
     for ch in CHAR_ORDER:
@@ -248,5 +248,55 @@ def fig_cards_sp_vs_mp(df: pd.DataFrame, min_runs: int = 10, vanilla=None) -> go
         xaxis=dict(title="singleplayer deck winrate", tickformat=".0%", range=[0, 1], constrain="domain"),
         yaxis=dict(title="multiplayer deck winrate", tickformat=".0%", range=[0, 1], scaleanchor="x", scaleratio=1),
         legend=dict(title="Character (click to toggle)")
+    )
+    return fig
+
+
+def fig_upgrades(df, min_runs: int = 10):
+    s = df[(df.runs_with_card >= min_runs)
+           & df.upgrade_rate.notna() & df.acquired_winrate.notna()].copy()
+    if s.empty:
+        raise ValueError("No cards clear the gate for upgrade_rate")
+    s = s.reset_index(drop=True)
+
+    chars = [c for c in CHAR_ORDER if c in s.character.unique()]
+    mx, my = s.upgrade_rate.median(), s.acquired_winrate.median()
+
+    fig = go.Figure()
+    for ch in chars:
+        cs = s[s.character == ch]
+        base = COLORS[ch]
+        point_colors = [_shade(base, RARITY_SHADE.get(r, 0.0)) for r in cs["rarity"]]
+        symbols = cs["rarity"].map(RARITY_SYMBOL).fillna("circle").tolist()
+        fig.add_trace(go.Scatter(
+            x=cs.upgrade_rate, y=cs.deck_winrate, mode="markers+text",
+            name=f"{ch} ({len(cs)})", legendgroup=ch,
+            marker=dict(size=MARKER_SIZE, sizemode="diameter",
+                        color=point_colors, opacity=0.6,
+                        symbol=symbols, line=dict(width=1.5, color=point_colors)),
+            text=cs.label, textposition="top center",
+            textfont=dict(size=11, color=base),
+            customdata=cs[["label", "times_upgraded", "runs_with_card", "deck_winrate",
+                           "upgrade_rate", "rarity", "type", "cost", "description"]].values,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b> · %{customdata[5]} %{customdata[6]} · %{customdata[7]} energy<br>"
+                "upgrade rate: %{customdata[4]:.1%}<br>"
+                "winrate: %{customdata[3]:.1%}<br>"
+                "upgraded %{customdata[1]}× · runs %{customdata[2]}<br>"
+                "<i>%{customdata[8]}</i>"
+                f"<extra>{ch}</extra>"
+            )
+        ))
+
+    fig.add_vline(x=mx, line=dict(color="grey", dash="dash", width=1))
+    fig.add_hline(y=my, line=dict(color="grey", dash="dash", width=1))
+    fig.update_layout(
+        template="plotly_white", autosize=True,
+        title="Card upgrade-priority vs performance — shape = rarity",
+        xaxis=dict(title="upgrade rate (when in deck)", tickformat=".0%",
+                   range=[0, 1], constrain="domain"),
+        yaxis=dict(title="deck winrate", tickformat=".0%",
+                   range=[0, 1], constrain="domain"),
+        legend=dict(title="Character (click to toggle)"),
     )
     return fig

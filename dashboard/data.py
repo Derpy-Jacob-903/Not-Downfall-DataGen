@@ -149,7 +149,12 @@ def prep_cards() -> pd.DataFrame:
     df = fetch("card_stats")
     numeric_cols = [
         "times_offered", "offered_3c", "runs_with_card", "deck_winrate", "pick_rate_3c",
-        "sp_runs_with_card", "sp_deck_winrate", "mp_runs_with_card", "mp_deck_winrate"
+        "sp_runs_with_card", "sp_deck_winrate", "mp_runs_with_card", "mp_deck_winrate",
+        "times_upgraded", "upgrade_rate",
+        "runs_acquired", "acquired_winrate",
+        "sp_runs_acquired", "sp_acquired_winrate",
+        "mp_runs_acquired", "mp_acquired_winrate",
+        "left_deck_rate",
     ]
     for col in numeric_cols:
         if col in df.columns:

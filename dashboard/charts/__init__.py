@@ -3,7 +3,7 @@ from typing import Callable
 import plotly.graph_objects as go
 
 from data import prep_cards, load_vanilla
-from .cards import fig_cards, fig_cards_sp, fig_cards_mp, fig_cards_sp_vs_mp
+from .cards import fig_cards, fig_cards_sp, fig_cards_mp, fig_cards_sp_vs_mp, fig_upgrades
 from .character import fig_ascension, fig_ascension_cum, fig_daily, fig_survival
 from .relics import fig_relics
 import traceback
@@ -32,6 +32,7 @@ def get_tabs() -> list[TabDefinition]:
             TabDefinition("cards_sp", "Cards - singleplayer", lambda: fig_cards_sp(cards_df.copy(), vanilla_df)),
             TabDefinition("cards_mp", "Cards - multiplayer", lambda: fig_cards_mp(cards_df.copy(), vanilla_df)),
             TabDefinition("cards_gap", "Cards - SP vs MP", lambda: fig_cards_sp_vs_mp(cards_df.copy(), vanilla=vanilla_df)),
+            TabDefinition("upgrades", "Card upgrade priority", lambda: fig_upgrades(cards_df.copy())),
         ])
     tabs.extend([
         TabDefinition("ascension", "Winrate x ascension", fig_ascension),
