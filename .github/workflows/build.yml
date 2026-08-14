@@ -28,7 +28,7 @@ jobs:
           conn = psycopg2.connect(os.environ["SUPABASE_DB_URL"])
           conn.autocommit = True
           cur = conn.cursor()
-          for v in ["card_stats","character_stats","floor_survival","reload_map","relic_stats"]:
+          for v in ["card_stats_by_version", "card_stats","character_stats","floor_survival","reload_map","relic_stats"]:
               print(f"refreshing {v}...", flush=True)
               cur.execute(f"refresh materialized view {v};")
           cur.close(); conn.close()
