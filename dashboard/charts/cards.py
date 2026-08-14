@@ -56,7 +56,8 @@ def _fig_cards(df, winrate_col, runs_col, title_suffix, vanilla=None, van_wr_col
     strike_rows = df[df["short"].str.startswith("STRIKE", na=False) & df["times_offered"].isna()].copy()
     strike = strike_rows.sort_values(runs_col, ascending=False).groupby("character")[winrate_col].first()
 
-    s_df = df[(df.offered_3c >= 10) & (df[runs_col] >= 10) & df.pick_rate_3c.notna() & df[winrate_col].notna()].copy()
+    s_df = df[(df.offered_3c >= 10) & (df[runs_col] >= 10) & df[winrate_col].notna()].copy()
+    s_df["pick_rate_3c"] = s_df["pick_rate_3c"].fillna(0)
     if s_df.empty:
         raise ValueError(f"No cards clear the gate for {winrate_col}")
 
