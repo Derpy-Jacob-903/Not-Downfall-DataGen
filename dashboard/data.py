@@ -47,103 +47,6 @@ def load_items() -> pd.DataFrame:
     return _load_items_slice("Downfall")
 
 
-def load_items_base() -> pd.DataFrame:
-    """Base-game card metadata."""
-    return _load_items_slice("Slay the Spire 2")
-
-
-def _fetch_metrics(bracket: str | None = None) -> pd.DataFrame:
-    """Base-game card metrics from Spire Codex for one bracket (unupgraded)."""
-    params = {}
-    if bracket:
-        params["bracket"] = bracket
-    try:
-        data = requests.get("https://spire-codex.com/api/runs/metrics/cards",
-                            params=params, timeout=30).json()
-    except Exception as e:
-        print(f"vanilla metrics fetch failed ({bracket}): {e}")
-        return pd.DataFrame()
-    v = pd.DataFrame(data.get("rows", []))
-    if v.empty:
-        return v
-    v = v[v["upgraded"] == False].copy()
-    v["win_rate"] = pd.to_numeric(v["win_rate"], errors="coerce") / 100.0
-    return v[["id", "win_rate", "picks"]]
-
-
-def _pooled_mp() -> pd.DataFrame:
-    """Pool 2p + 3p + 4p into one run-weighted multiplayer winrate per card."""
-    frames = []
-    for b in ["2p", "3p", "4p"]:
-        f = _fetch_metrics(b)
-        if not f.empty:
-            f = f.rename(columns={"win_rate": "wr", "picks": "n"})
-            frames.append(f)
-    if not frames:
-        return pd.DataFrame(columns=["id", "mp_win_rate", "mp_picks"])
-    allmp = pd.concat(frames, ignore_index=True)
-    allmp["wins"] = allmp["wr"] * allmp["n"]
-    g = allmp.groupby("id").agg(wins=("wins", "sum"), n=("n", "sum")).reset_index()
-    g["mp_win_rate"] = g["wins"] / g["n"]
-    return g.rename(columns={"n": "mp_picks"})[["id", "mp_win_rate", "mp_picks"]]
-
-def load_vanilla(min_picks: int = 5000) -> pd.DataFrame:
-    """Base-game card metrics (Spire Codex) + rarity/name/text/color from items.json, as reference points."""
-    try:
-        data = requests.get("https://spire-codex.com/api/runs/metrics/cards", timeout=30).json()
-    except Exception as e:
-        print(f"vanilla reference fetch failed, skipping: {e}")
-        return pd.DataFrame()
-    v = pd.DataFrame(data["rows"])
-    v = v[(v["upgraded"] == False) & v["pick_rate"].notna()].copy()
-    v["win_rate"] = pd.to_numeric(v["win_rate"], errors="coerce") / 100.0
-    v["pick_rate"] = pd.to_numeric(v["pick_rate"], errors="coerce") / 100.0
-    v = v[v["picks"] >= min_picks]
-    v = v[["id", "win_rate", "pick_rate", "tier", "picks"]]
-
-    # SP and pooled-MP winrates
-    sp = _fetch_metrics("solo").rename(columns={"win_rate": "sp_win_rate", "picks": "sp_picks"})
-    mp = _pooled_mp()
-    if not sp.empty:
-        v = v.merge(sp, on="id", how="left")
-    if not mp.empty:
-        v = v.merge(mp, on="id", how="left")
-
-    meta = load_items_base()
-    v = v.merge(meta, on="id", how="left")
-    v["label"] = v["name"].fillna(v["id"])
-    v["description"] = v["description"].str.replace("\n", "<br>", regex=False)
-    if "color" not in v.columns:
-        v["color"] = "unknown"
-    v["color"] = v["color"].fillna("unknown")
-    return v
-
-def load_vanilla_ascension(cumulative: bool = False) -> pd.DataFrame:
-    try:
-        c = requests.get("https://spire-codex.com/api/charts/winrate-by-ascension",
-                         params={"split": "character"}, timeout=30).json()
-    except Exception as e:
-        print(f"vanilla ascension fetch failed, skipping: {e}")
-        return pd.DataFrame()
-    rows = []
-    for series in c.get("series", []):
-        cid = series.get("id", "").lower()
-        pts = sorted(series.get("points", []), key=lambda p: p["x"])
-        if cumulative:
-            runs_cum = wins_cum = 0
-            for p in reversed(pts):
-                n = p["n"]; w = round(n * p["y"] / 100.0)
-                runs_cum += n; wins_cum += w
-                rows.append({"character": cid, "ascension": p["x"],
-                             "winrate": wins_cum / runs_cum if runs_cum else None,
-                             "runs": runs_cum})
-        else:
-            for p in pts:
-                rows.append({"character": cid, "ascension": p["x"],
-                             "winrate": p["y"] / 100.0, "runs": p["n"]})
-    return pd.DataFrame(rows)
-
-
 def prep_cards() -> pd.DataFrame:
     """Fetch and prepare card stats dataframe once for reuse."""
     df = fetch("card_stats")
@@ -165,7 +68,7 @@ def prep_cards() -> pd.DataFrame:
 
     items = load_items()
     df = df.merge(items, left_on="card", right_on="id", how="left")
-    df = df.reset_index(drop=True)          # <- add this
+    df = df.reset_index(drop=True)
     df = df.drop(columns=["id"], errors="ignore")
     df = df.loc[:, ~df.columns.duplicated()]
     df["description"] = df["description"].str.replace("\n", "<br>", regex=False)
@@ -173,24 +76,28 @@ def prep_cards() -> pd.DataFrame:
     return df
 
 
-def load_vanilla_over_time() -> pd.DataFrame:
-    """Base-game WEEKLY win rate over time, per character (Spire Codex).
+def prep_cards_by_version() -> pd.DataFrame:
+    """card_stats_by_version + card metadata, keyed by card.
 
-    'frame' chart like winrate-by-ascension, so expected shape is
-    {"series":[{"id","points":[{"x","y","n"}]}]}, x a week, y a win %.
-    Buckets are weekly, not daily.
+    Exports RAW COUNTS (offered_3c, picked_3c, *_runs_acquired, *_wins_acquired)
+    so the client can aggregate across versions and switch SP/MP/all by
+    re-dividing wins/runs — never averaging pre-computed rates.
     """
-    try:
-        c = requests.get("https://spire-codex.com/api/charts/winrate-over-time",
-                         params={"split": "character"}, timeout=30).json()
-    except Exception as e:
-        print(f"vanilla over-time fetch failed, skipping: {e}")
-        return pd.DataFrame()
-    rows = []
-    for series in c.get("series", []):
-        cid = series.get("id", "").lower()
-        for p in sorted(series.get("points", []), key=lambda p: p["x"]):
-            rows.append({"character": cid,
-                         "week": pd.to_datetime(p["x"], errors="coerce"),
-                         "winrate": p["y"] / 100.0, "runs": p.get("n")})
-    return pd.DataFrame(rows)
+    df = fetch("card_stats_by_version")
+    count_cols = ["offered_3c", "picked_3c",
+                  "runs_acquired", "wins_acquired",
+                  "sp_runs_acquired", "sp_wins_acquired",
+                  "mp_runs_acquired", "mp_wins_acquired"]
+    for c in count_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0).astype(int)
+
+    df["character"] = df["card"].map(char_of)
+    df["short"] = df["card"].str.split("-", n=1).str[-1]
+
+    items = load_items()
+    df = df.merge(items, left_on="card", right_on="id", how="left")
+    df = df.drop(columns=["id"], errors="ignore")
+    df = df.loc[:, ~df.columns.duplicated()]
+    df["label"] = df["name"].fillna(df["short"])
+    return df

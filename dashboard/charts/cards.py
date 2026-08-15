@@ -35,24 +35,10 @@ RARITY_SYMBOL = {
     "Ancient":  "hexagram",
 }
 
-VANILLA_COLORS = {
-    "ironclad":    "#D62000",
-    "silent":      "#5EBD00",
-    "defect":      "#3EB3ED",
-    "necrobinder": "#CD4EED",
-    "regent":      "#E36600",
-    "colorless":   "#A3A3A3",
-    "curse":       "#585B61",
-    "status":      "#9C9C9C",
-    "unknown":     "#999999",
-}
-VANILLA_ORDER = ["ironclad", "silent", "defect", "necrobinder", "regent",
-                 "colorless", "curse", "status", "unknown"]
-
 MARKER_SIZE = 12   # <- single size knob for the card scatter
 
 
-def _fig_cards(df, winrate_col, runs_col, title_suffix, vanilla=None, van_wr_col="win_rate"):
+def _fig_cards(df, winrate_col, runs_col, title_suffix):
     strike_rows = df[df["short"].str.startswith("STRIKE", na=False) & df["times_offered"].isna()].copy()
     strike = strike_rows.sort_values(runs_col, ascending=False).groupby("character")[winrate_col].first()
 
@@ -65,12 +51,6 @@ def _fig_cards(df, winrate_col, runs_col, title_suffix, vanilla=None, van_wr_col
     mx, my = s_df.pick_rate_3c.median(), s_df[winrate_col].median()
 
     RARITIES = ["All", "Common", "Uncommon", "Rare"]
-
-    # vanilla: only keep rows that have the winrate for THIS tab (solo/mp/all)
-    van = None
-    if vanilla is not None and not vanilla.empty and van_wr_col in vanilla.columns:
-        van = vanilla[vanilla[van_wr_col].notna()].copy()
-        van["_wr"] = van[van_wr_col]
 
     fig = go.Figure()
     for ch in chars:
@@ -99,14 +79,6 @@ def _fig_cards(df, winrate_col, runs_col, title_suffix, vanilla=None, van_wr_col
         ))
 
     n_char_traces = len(chars)
-    n_strike = sum(1 for ch in chars if ch in strike.index and pd.notna(strike[ch]))
-
-    van_colors = []
-    if van is not None and not van.empty:
-        present = set(van["color"].unique())
-        van_colors = [c for c in VANILLA_ORDER if c in present]
-
-    van_indices = {col: n_char_traces + n_strike + i for i, col in enumerate(van_colors)}
 
     buttons = []
     for rar in RARITIES:
@@ -127,19 +99,6 @@ def _fig_cards(df, winrate_col, runs_col, title_suffix, vanilla=None, van_wr_col
         prop = {"x": xs, "y": ys, "text": texts,
                 "marker.color": colors, "marker.symbol": syms, "customdata": cds}
         target = list(range(n_char_traces))
-
-        for col in van_colors:
-            vc = van[van["color"] == col]
-            vf = vc if rar == "All" else vc[vc["rarity"] == rar]
-            prop["x"].append(vf.pick_rate.tolist())
-            prop["y"].append(vf["_wr"].tolist())
-            prop["text"].append([""] * len(vf))
-            prop["marker.color"].append([VANILLA_COLORS.get(col, "#999999")] * len(vf))
-            prop["marker.symbol"].append(vf["rarity"].map(RARITY_SYMBOL).fillna("x").tolist())
-            prop["customdata"].append(
-                vf[["label", "_wr", "pick_rate", "tier", "picks", "rarity", "description"]].values)
-            target.append(van_indices[col])
-
         buttons.append(dict(label=rar, method="restyle", args=[prop, target]))
 
     for ch in chars:
@@ -150,24 +109,6 @@ def _fig_cards(df, winrate_col, runs_col, title_suffix, vanilla=None, van_wr_col
                 legendgroup=ch, showlegend=False,
                 hovertemplate=f"{ch} Strike baseline: %{{y:.1%}}<extra></extra>"
             ))
-
-    for col in van_colors:
-        vc = van[van["color"] == col]
-        cval = VANILLA_COLORS.get(col, "#999999")
-        fig.add_trace(go.Scatter(
-            x=vc.pick_rate, y=vc["_wr"], mode="markers",
-            name=f"base: {col} ({len(vc)})", legendgroup=f"van_{col}",
-            marker=dict(size=6, color=cval, opacity=0.4,
-                        symbol=vc["rarity"].map(RARITY_SYMBOL).fillna("x").tolist(),
-                        line=dict(width=0)),
-            customdata=vc[["label", "_wr", "pick_rate", "tier", "picks",
-                           "rarity", "description"]].values,
-            hovertemplate=("<b>%{customdata[0]}</b> · %{customdata[5]} (base: " + col + ")<br>"
-                                                                                        "winrate %{customdata[1]:.1%}<br>"
-                                                                                        "pick %{customdata[2]:.1%} · tier %{customdata[4]}<br>"
-                                                                                        "<i>%{customdata[6]}</i>"
-                                                                                        "<extra>base: " + col + "</extra>")
-        ))
 
     fig.add_vline(x=mx, line=dict(color="grey", dash="dash", width=1))
     fig.add_hline(y=my, line=dict(color="grey", dash="dash", width=1))
@@ -189,19 +130,19 @@ def _fig_cards(df, winrate_col, runs_col, title_suffix, vanilla=None, van_wr_col
     return fig
 
 
-def fig_cards(df, vanilla=None):
-    return _fig_cards(df, "acquired_winrate", "runs_acquired", "", vanilla, van_wr_col="win_rate")
+def fig_cards(df):
+    return _fig_cards(df, "acquired_winrate", "runs_acquired", "")
 
 
-def fig_cards_sp(df, vanilla=None):
-    return _fig_cards(df, "sp_acquired_winrate", "sp_runs_acquired", " · singleplayer", vanilla, van_wr_col="sp_win_rate")
+def fig_cards_sp(df):
+    return _fig_cards(df, "sp_acquired_winrate", "sp_runs_acquired", " · singleplayer")
 
 
-def fig_cards_mp(df, vanilla=None):
-    return _fig_cards(df, "mp_acquired_winrate", "mp_runs_acquired", " · multiplayer", vanilla, van_wr_col="mp_win_rate")
+def fig_cards_mp(df):
+    return _fig_cards(df, "mp_acquired_winrate", "mp_runs_acquired", " · multiplayer")
 
 
-def fig_cards_sp_vs_mp(df: pd.DataFrame, min_runs: int = 10, vanilla=None) -> go.Figure:
+def fig_cards_sp_vs_mp(df: pd.DataFrame, min_runs: int = 10) -> go.Figure:
     s = df[(df.sp_runs_acquired >= min_runs) & (df.mp_runs_acquired >= min_runs)
            & df.sp_acquired_winrate.notna() & df.mp_acquired_winrate.notna()].copy()
     s = s.reset_index(drop=True)
@@ -225,20 +166,6 @@ def fig_cards_sp_vs_mp(df: pd.DataFrame, min_runs: int = 10, vanilla=None) -> go
                 f"gap %{{customdata[5]:+.1%}}<extra>{ch}</extra>"
             )
         ))
-    if vanilla is not None and not vanilla.empty \
-                and "sp_win_rate" in vanilla.columns and "mp_win_rate" in vanilla.columns:
-        vg = vanilla[vanilla["sp_win_rate"].notna() & vanilla["mp_win_rate"].notna()].copy()
-        if not vg.empty:
-            fig.add_trace(go.Scatter(
-                x=vg.sp_win_rate, y=vg.mp_win_rate, mode="markers",
-                name=f"base game ({len(vg)})", legendgroup="vanilla",
-                marker=dict(size=6, color="#999999", opacity=0.4, symbol="x", line=dict(width=0)),
-                customdata=vg[["label", "sp_win_rate", "mp_win_rate", "sp_picks", "mp_picks"]].values,
-                hovertemplate=("<b>%{customdata[0]}</b> (base game)<br>"
-                               "solo %{customdata[1]:.1%} (n=%{customdata[3]})<br>"
-                               "MP %{customdata[2]:.1%} (n=%{customdata[4]})"
-                               "<extra>base game</extra>")
-            ))
     fig.add_trace(go.Scatter(
         x=[0, 1], y=[0, 1], mode="lines",
         line=dict(color="grey", dash="dash", width=1), name="equal", hoverinfo="skip", showlegend=False
