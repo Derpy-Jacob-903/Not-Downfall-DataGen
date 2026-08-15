@@ -1,11 +1,8 @@
 import os
 import json
 import pandas as pd
-import plotly.io as pio
 import traceback
 
-from charts import get_tabs
-from template import render_html
 from data import prep_cards_by_version, fetch
 
 
@@ -62,41 +59,6 @@ def build():
     except Exception as e:
         print(f"index.html copy failed: {e}")
 
-    # ---- 3. the existing Plotly tabs, kept at charts.html ----
-    tabs = get_tabs()
-    buttons, panels, first_ok = [], [], True
-    for tab in tabs:
-        try:
-            figure = tab.builder()
-        except Exception as e:
-            print(f"Skipping tab '{tab.id}': {e}")
-            traceback.print_exc()
-            continue
-        div = pio.to_html(
-            figure,
-            include_plotlyjs=("cdn" if first_ok else False),
-            full_html=False,
-            div_id=f"plot-{tab.id}",
-            default_height="88vh",
-            config={"scrollZoom": True, "responsive": True},
-        )
-        buttons.append(
-            f'<button class="tab-btn{" active" if first_ok else ""}" '
-            f'onclick="showTab(\'{tab.id}\',this)">{tab.label}</button>'
-        )
-        panels.append(
-            f'<div id="{tab.id}" class="tab-content"'
-            f'{"" if first_ok else " style=\"display:none\""}>{div}</div>'
-        )
-        first_ok = False
-
-    if panels:
-        html = render_html(buttons, panels, updated)
-        with open("public/charts.html", "w") as f:
-            f.write(html)
-        print("Wrote public/charts.html")
-    else:
-        print("No Plotly tabs built — skipping charts.html")
 
 
 if __name__ == "__main__":
