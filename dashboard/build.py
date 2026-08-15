@@ -15,6 +15,7 @@ def export_data_files():
 
     # ---- cards.json : one row per (card, version_group), RAW COUNTS ----
     dfv = prep_cards_by_version()
+    dfv = dfv[dfv["character"] != "COLORLESS"]
     keep = ["card", "version_group", "label", "character", "rarity", "type", "cost",
             "description",
             "offered_3c", "picked_3c",
