@@ -74,6 +74,14 @@
             <div class="checks" id="chars"></div>
         </div>
         <div class="group">
+            <div class="lbl">Mode</div>
+            <select id="mode">
+                <option value="all" selected>All players</option>
+                <option value="sp">Solo</option>
+                <option value="mp">Multiplayer</option>
+            </select>
+        </div>
+        <div class="group">
             <div class="lbl">Version</div>
             <select id="version"><option value="all">All versions</option></select>
         </div>
@@ -107,11 +115,6 @@
             <div class="card-head">
                 <h2>Draft priority &times; winrate</h2>
                 <span class="hint">shape = rarity &middot; crosshair = medians</span>
-                <div class="seg" id="mode">
-                    <button data-m="all" class="on">All</button>
-                    <button data-m="sp">Solo</button>
-                    <button data-m="mp">Multi</button>
-                </div>
             </div>
             <div id="scatter" class="chart"></div>
         </div>
@@ -243,8 +246,11 @@
             const pre=charPrefix(r.character);
             if(!state.chars.has(pre)) continue;
             (perChar[pre]=perChar[pre]||{});
-            perChar[pre][r.bucket]=(perChar[pre][r.bucket]||0)+num(r.runs);
-            bucketSet.add(r.bucket); total+=num(r.runs);
+            const runs = state.mode==="sp" ? num(r.sp_runs)
+                : state.mode==="mp" ? num(r.mp_runs)
+                    : num(r.runs);
+            perChar[pre][r.bucket]=(perChar[pre][r.bucket]||0)+runs;
+            bucketSet.add(r.bucket); total+=runs;
         }
         return {buckets:[...bucketSet].sort(), perChar, total};
     }
@@ -289,7 +295,11 @@
             if(!state.chars.has(pre)) continue;
             const f=r.character, b=r[key];
             (g[f]=g[f]||{}); (g[f][b]=g[f][b]||{runs:0,wins:0});
-            g[f][b].runs+=num(r.runs); g[f][b].wins+=num(r.wins);
+            let rn, wn;
+            if(state.mode==="sp"){rn=num(r.sp_runs);wn=num(r.sp_wins);}
+            else if(state.mode==="mp"){rn=num(r.mp_runs);wn=num(r.mp_wins);}
+            else{rn=num(r.runs);wn=num(r.wins);}
+            g[f][b].runs+=rn; g[f][b].wins+=wn;
         }
         return g;
     }
@@ -359,11 +369,7 @@
     document.getElementById("version").addEventListener("change",e=>{state.version=e.target.value;renderAll();});
     document.getElementById("rarity").addEventListener("change",e=>{state.rarity=e.target.value;drawScatter();});
     document.getElementById("minruns").addEventListener("change",e=>{state.minRuns=+e.target.value;drawScatter();});
-    document.getElementById("mode").addEventListener("click",e=>{
-        const b=e.target.closest("button");if(!b)return;
-        document.querySelectorAll("#mode button").forEach(x=>x.classList.remove("on"));
-        b.classList.add("on");state.mode=b.dataset.m;drawScatter();
-    });
+    document.getElementById("mode").addEventListener("change",e=>{state.mode=e.target.value;renderAll();});
     window.addEventListener("resize",()=>["scatter","perday","perhour","asc","daily"].forEach(id=>{const el=document.getElementById(id);if(el&&el.data)Plotly.Plots.resize(id);}));
 
     async function init(){

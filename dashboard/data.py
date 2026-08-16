@@ -3,6 +3,36 @@ import requests
 from config import SUPABASE_URL, KEY, char_of
 import json
 import os
+import time
+
+
+def _get_with_retry(url, headers, params, max_retries=5, base_delay=1.5):
+    """GET with retry-and-backoff on transient failures (5xx, 429, network errors).
+
+    Real client errors (4xx other than 429) are raised immediately, since
+    waiting won't fix a malformed request or bad auth.
+    """
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            r = requests.get(url, headers=headers, params=params, timeout=90)
+            # treat 5xx and 429 as transient -> retry; other 4xx -> raise now
+            if r.status_code >= 500 or r.status_code == 429:
+                raise requests.HTTPError(
+                    f"{r.status_code} {r.reason}", response=r)
+            r.raise_for_status()
+            return r
+        except (requests.HTTPError, requests.ConnectionError, requests.Timeout) as e:
+            resp = getattr(e, "response", None)
+            if resp is not None and 400 <= resp.status_code < 500 and resp.status_code != 429:
+                raise  # genuine client error, don't retry
+            last_err = e
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)  # 1.5s, 3s, 6s, 12s ...
+                print(f"  transient error ({e}); retry "
+                      f"{attempt + 1}/{max_retries - 1} in {delay:.1f}s")
+                time.sleep(delay)
+    raise last_err
 
 
 def fetch(view: str) -> pd.DataFrame:
@@ -13,9 +43,7 @@ def fetch(view: str) -> pd.DataFrame:
     frames = []
     while True:
         params = {"select": "*", "limit": str(page_size), "offset": str(offset)}
-        r = requests.get(f"{SUPABASE_URL}/rest/v1/{view}",
-                         headers=headers, params=params, timeout=90)
-        r.raise_for_status()
+        r = _get_with_retry(f"{SUPABASE_URL}/rest/v1/{view}", headers, params)
         batch = r.json()
         if not batch:
             break
