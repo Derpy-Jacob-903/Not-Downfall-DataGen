@@ -3,11 +3,11 @@ import json
 import pandas as pd
 import traceback
 
-from data import prep_cards_by_version, fetch
+from data import prep_cards_by_version, fetch, prep_relics
 
 
 def export_data_files():
-    """Write public/cards.json, activity.json, characters.json for the static explorer."""
+    """Write public/cards.json, activity.json, characters.json, relics.json for the static explorer."""
     os.makedirs("public", exist_ok=True)
 
     # ---- cards.json : one row per (card, version_group), RAW COUNTS ----
@@ -22,6 +22,16 @@ def export_data_files():
     dfv[[c for c in keep if c in dfv.columns]].to_json(
         "public/cards.json", orient="records")
     print(f"Wrote public/cards.json ({len(dfv)} rows)")
+
+    # ---- relics.json : one row per (relic, version_group), RAW COUNTS + metadata ----
+    rel = prep_relics()
+    keep_rel = ["relic", "version_group", "label", "name", "tier", "description",
+                "runs_with_relic", "wins_with_relic",
+                "sp_runs_with_relic", "sp_wins_with_relic",
+                "mp_runs_with_relic", "mp_wins_with_relic"]
+    rel[[c for c in keep_rel if c in rel.columns]].to_json(
+        "public/relics.json", orient="records")
+    print(f"Wrote public/relics.json ({len(rel)} rows)")
 
     # ---- activity.json : {day, hour} runs over time ----
     day = fetch("runs_per_day")
@@ -58,7 +68,6 @@ def build():
         print("Copied index.html")
     except Exception as e:
         print(f"index.html copy failed: {e}")
-
 
 
 if __name__ == "__main__":

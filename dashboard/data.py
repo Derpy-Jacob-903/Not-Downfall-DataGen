@@ -129,3 +129,63 @@ def prep_cards_by_version() -> pd.DataFrame:
     df = df.loc[:, ~df.columns.duplicated()]
     df["label"] = df["name"].fillna(df["short"])
     return df
+
+
+def _load_relics_slice(mod_name: str) -> pd.DataFrame:
+    """Load one mod's relic metadata (name, tier, description) keyed by id, from items.json.
+
+    Note: the `pool` field is an internal pool key (e.g.
+    "relic_pool:automaton-automaton_relic_pool"), not a clean character name,
+    so we don't export it — the client classifies relics by the id prefix
+    (AUTOMATON-..., CHAMP-...) instead.
+    """
+    path = os.path.join(os.path.dirname(__file__), "items.json")
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    records = data.get("relics", []) if isinstance(data, dict) else []
+    relics = pd.DataFrame(records)
+    if relics.empty:
+        return relics
+    if "mod" in relics.columns:
+        relics = relics[relics["mod"] == mod_name]
+    # keep the latest schema version per relic id, mirroring the card loader's
+    # dedup intent (cards dedup on `upgrades`; relics have no upgrades, use `v`)
+    if "v" in relics.columns:
+        relics = relics.sort_values("v").drop_duplicates("id", keep="last")
+    else:
+        relics = relics.drop_duplicates("id", keep="first")
+    cols = [c for c in ["id", "name", "tier", "description"] if c in relics.columns]
+    return relics[cols]
+
+
+def load_relics() -> pd.DataFrame:
+    """Downfall relic metadata."""
+    return _load_relics_slice("Downfall")
+
+
+def prep_relics() -> pd.DataFrame:
+    """relic_stats view joined to relic metadata, keyed by relic id.
+
+    Exports RAW COUNTS (*_runs_with_relic, *_wins_with_relic) so the client
+    re-divides wins/runs per SP/MP/all — never averaging pre-computed rates.
+    Character classification is done client-side from the id prefix.
+    """
+    df = fetch("relic_stats")
+    count_cols = ["runs_with_relic", "wins_with_relic",
+                  "sp_runs_with_relic", "sp_wins_with_relic",
+                  "mp_runs_with_relic", "mp_wins_with_relic"]
+    for c in count_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0).astype(int)
+
+    meta = load_relics()
+    if not meta.empty:
+        df = df.merge(meta, left_on="relic", right_on="id", how="left")
+        df = df.drop(columns=["id"], errors="ignore")
+        df = df.loc[:, ~df.columns.duplicated()]
+    # display name falls back to the raw id when metadata is missing
+    if "name" in df.columns:
+        df["label"] = df["name"].fillna(df["relic"])
+    else:
+        df["label"] = df["relic"]
+    return df

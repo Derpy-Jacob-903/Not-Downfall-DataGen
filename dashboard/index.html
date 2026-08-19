@@ -130,6 +130,18 @@
             <div class="card-head"><h2>Winrate &times; day</h2><span class="hint">per character &middot; days with &ge;5 runs</span></div>
             <div id="daily" class="chart wide"></div>
         </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h2>Relic winrate</h2>
+                <span class="hint">runs (log) &times; winrate &middot; character relics labeled &middot; respects mode &amp; min-runs</span>
+                <span class="seg" id="baseSeg">
+                    <button class="on">Downfall</button>
+                    <button>+ Base game</button>
+                </span>
+            </div>
+            <div id="relics" class="chart" style="height:520px"></div>
+        </div>
     </main>
 </div>
 <script>
@@ -143,8 +155,8 @@
     COLORS["COLORLESS"]="#999999";
     const RSYM={Common:"circle",Uncommon:"diamond",Rare:"star",Basic:"circle-open",Token:"cross",Ancient:"hexagram"};
     const ASC_MIN=5, DAY_MIN=5;   // per-point run thresholds for the character charts
-    let CARDS=[], ACT={day:[],hour:[]}, CHARD={ascension:[],daily:[]};
-    const state={version:"all",rarity:"all",minRuns:10,mode:"all",chars:new Set(CHAR_ORDER.concat("COLORLESS"))};
+    let CARDS=[], ACT={day:[],hour:[]}, CHARD={ascension:[],daily:[]}, RELICS=[];
+    const state={version:"all",rarity:"all",minRuns:20,mode:"all",showBase:false,chars:new Set(CHAR_ORDER.concat("COLORLESS"))};
     const charPrefix=s=>{const p=String(s).split("-")[0];return CHAR_ORDER.includes(p)?p:"COLORLESS";};
     const titlecase=s=>s[0]+s.slice(1).toLowerCase();
     const num=x=>{const n=+x;return isFinite(n)?n:0;};
@@ -285,6 +297,63 @@
         document.getElementById("s-runs").textContent=day.total.toLocaleString();
     }
 
+    function aggRelics(){
+        const byRelic={};
+        for(const r of RELICS){
+            if(state.version!=="all" && r.version_group && r.version_group!==state.version) continue;
+            const k=r.relic;
+            if(!byRelic[k]) byRelic[k]={relic:r.relic,
+                label:r.label||r.name||String(r.relic),tier:r.tier,description:r.description,
+                runs_with_relic:0,wins_with_relic:0,
+                sp_runs_with_relic:0,sp_wins_with_relic:0,
+                mp_runs_with_relic:0,mp_wins_with_relic:0};
+            const a=byRelic[k];
+            for(const f of ["runs_with_relic","wins_with_relic","sp_runs_with_relic",
+                "sp_wins_with_relic","mp_runs_with_relic","mp_wins_with_relic"])
+                a[f]+=num(r[f]);
+        }
+        const out=[];
+        for(const k in byRelic){
+            const a=byRelic[k], ch=charPrefix(a.relic);
+            const isBase=ch==="COLORLESS";
+            if(isBase){ if(!state.showBase) continue; }      // graph toggle only
+            else if(!state.chars.has(ch)) continue;          // side character filter
+            let runs,wins;
+            if(state.mode==="sp"){runs=a.sp_runs_with_relic;wins=a.sp_wins_with_relic;}
+            else if(state.mode==="mp"){runs=a.mp_runs_with_relic;wins=a.mp_wins_with_relic;}
+            else{runs=a.runs_with_relic;wins=a.wins_with_relic;}
+            if(runs<state.minRuns || runs<=0) continue;
+            out.push({label:a.label,wr:wins/runs,n:runs,character:ch,base:isBase,
+                tier:a.tier?" \u00b7 "+a.tier:"",description:a.description||""});
+        }
+        out.sort((a,b)=>b.wr-a.wr);
+        return out;
+    }
+
+    function drawRelics(){
+        const rel=aggRelics();
+        const med=median(rel.map(d=>d.wr));
+        const chars=[...new Set(rel.map(d=>d.character))]
+            .sort((a,b)=>CHAR_ORDER.indexOf(a)-CHAR_ORDER.indexOf(b));
+        const traces=chars.map(ch=>{
+            const cs=rel.filter(d=>d.character===ch);
+            return {type:"scattergl",mode:"markers+text",name:titlecase(ch),
+                x:cs.map(d=>d.n),y:cs.map(d=>d.wr),
+                // label character relics; leave colorless unlabeled (marker + hover only)
+                text:cs.map(d=>ch==="COLORLESS"?"":d.label),
+                textposition:"top center",textfont:{size:9,color:COLORS[ch]},
+                marker:{size:9,opacity:.8,color:COLORS[ch],line:{width:0.5,color:"#141019"}},
+                customdata:cs.map(d=>[d.label,d.wr,d.n,d.tier||"",d.description||""]),
+                hovertemplate:"<b>%{customdata[0]}</b>%{customdata[3]}<br>winrate %{customdata[1]:.1%} (n=%{customdata[2]})<br><i>%{customdata[4]}</i><extra>"+titlecase(ch)+"</extra>"};
+        });
+        const shapes = med!=null ? [{type:"line",xref:"paper",x0:0,x1:1,y0:med,y1:med,
+            line:{color:"#5a5170",dash:"dash",width:1}}] : [];
+        Plotly.react("relics",traces,darkLayout({
+                xaxis:{title:"runs with relic (log)",type:"log",gridcolor:"#2a2338"},
+                yaxis:{title:"winrate",tickformat:".0%",gridcolor:"#2a2338",rangemode:"tozero"},shapes}),
+            {displayModeBar:false,responsive:true});
+    }
+
     // ---- character winrate: aggregate raw counts respecting version + character ----
     function aggChar(rows,key){
         // group: character(full) -> bucket(key) -> {runs,wins}
@@ -335,11 +404,15 @@
             {displayModeBar:false,responsive:true});
     }
 
-    function renderAll(){drawScatter();drawActivity();drawChars();}
+    function renderAll(){drawScatter();drawRelics();drawActivity();drawChars();}
 
     function buildChars(){
         const box=document.getElementById("chars");
-        const present=CHAR_ORDER.concat("COLORLESS").filter(c=>CARDS.some(r=>charPrefix(r.character)===c));
+        // COLORLESS is intentionally excluded: base-game (colorless) relics are
+        // controlled by the on-graph "base game" toggle, not the side checkboxes.
+        const present=CHAR_ORDER.filter(c=>
+            CARDS.some(r=>charPrefix(r.character)===c) ||
+            RELICS.some(r=>charPrefix(r.relic)===c));
         present.forEach(c=>{
             const el=document.createElement("label");
             el.className="check on";el.dataset.c=c;
@@ -368,20 +441,30 @@
     }
     document.getElementById("version").addEventListener("change",e=>{state.version=e.target.value;renderAll();});
     document.getElementById("rarity").addEventListener("change",e=>{state.rarity=e.target.value;drawScatter();});
-    document.getElementById("minruns").addEventListener("change",e=>{state.minRuns=+e.target.value;drawScatter();});
+    document.getElementById("minruns").addEventListener("change",e=>{state.minRuns=+e.target.value;drawScatter();drawRelics();});
     document.getElementById("mode").addEventListener("change",e=>{state.mode=e.target.value;renderAll();});
-    window.addEventListener("resize",()=>["scatter","perday","perhour","asc","daily"].forEach(id=>{const el=document.getElementById(id);if(el&&el.data)Plotly.Plots.resize(id);}));
+    document.querySelectorAll("#baseSeg button").forEach((b,i)=>{
+        b.addEventListener("click",()=>{
+            document.querySelectorAll("#baseSeg button").forEach(x=>x.classList.remove("on"));
+            b.classList.add("on");
+            state.showBase = i===1;   // 0 = Downfall only, 1 = + Base game
+            drawRelics();
+        });
+    });
+    window.addEventListener("resize",()=>["scatter","relics","perday","perhour","asc","daily"].forEach(id=>{const el=document.getElementById(id);if(el&&el.data)Plotly.Plots.resize(id);}));
 
     async function init(){
         try{
-            const [cards,act,chard]=await Promise.all([
+            const [cards,act,chard,relics]=await Promise.all([
                 fetch("cards.json").then(r=>{if(!r.ok)throw new Error("cards.json "+r.status);return r.json();}),
                 fetch("activity.json").then(r=>r.ok?r.json():{day:[],hour:[]}).catch(()=>({day:[],hour:[]})),
                 fetch("characters.json").then(r=>r.ok?r.json():{ascension:[],daily:[]}).catch(()=>({ascension:[],daily:[]})),
+                fetch("relics.json").then(r=>r.ok?r.json():[]).catch(()=>[]),
             ]);
             CARDS=cards;
             ACT=(act&&act.day)?act:{day:[],hour:[]};
             CHARD=(chard&&chard.ascension)?chard:{ascension:[],daily:[]};
+            RELICS=Array.isArray(relics)?relics:[];
             document.getElementById("stamp").textContent="";
             buildChars();buildVersions();renderAll();
         }catch(err){
