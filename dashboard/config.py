@@ -2,13 +2,16 @@ import os
 import colorsys
 
 KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
-SUPABASE_URL = "https://wxememsxgrgrfvntulgr.supabase.co"
+SUPABASE_URL = "https://poefclgeeqhmtpdcrcev.supabase.co"
 
 # Palette configuration
 S, V = 0.65, 0.80
 ORDER = [
-    "HERMIT-HERMIT", "GUARDIAN-GUARDIAN", "AUTOMATON-AUTOMATON", "SLIMEBOSS-SLIME_BOSS",
-    "SNECKO-SNECKO", "AWAKENED-AWAKENED", "CHAMP-CHAMP", "HEXAGHOST-HEXAGHOST"
+    #"BLDSURV-BLD_SURV", 
+    #"DRUIDSURV-DRUID_SURV", "DRUIDSURV-WIZARD_SURV"
+    "JESTER-JESTER",
+    "MOONSCREEDPORT-ARCRANE", "MOONSCREEDPORT-AYTEK", "MOONSCREEDPORT-ECHO", "MOONSCREEDPORT-POLARIX",
+    "THERAILGUN2-THE_RAILGUN2", 
 ]
 CHAR_ORDER = [c.split("-")[0] for c in ORDER]
 
@@ -17,6 +20,15 @@ for i, name in enumerate(CHAR_ORDER):
     rr, gg, bb = colorsys.hsv_to_rgb(i / len(CHAR_ORDER), S, V)
     COLORS[name] = f"#{int(rr * 255):02X}{int(gg * 255):02X}{int(bb * 255):02X}"
 COLORS["COLORLESS"] = "#999999"
+COLORS["BLDSURV-BLD_SURV"] = "#56a786"
+COLORS["DRUIDSURV-DRUID_SURV"] = "#974d2c"
+COLORS["DRUIDSURV-WIZARD_SURV"] = "#C45B6F"
+COLORS["JESTER-JESTER"] = "#ff00ae"
+COLORS["THERAILGUN2-THE_RAILGUN2"] = "#33FFAD"
+COLORS["MOONSCREEDPORT-ARCRANE"] = "#bbdb44"
+COLORS["MOONSCREEDPORT-AYTEK"] = "#f65d34"
+COLORS["MOONSCREEDPORT-ECHO"] = "#3dd9ca"
+COLORS["MOONSCREEDPORT-POLARIX"] = "#D780FF"
 
 
 def char_of(entity_name: str) -> str:
