@@ -1,58 +1,84 @@
 name: Build and deploy card explorer
+
 on:
   schedule:
     - cron: "50 1-23/3 * * *"
   workflow_dispatch:
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 concurrency:
   group: pages
   cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - run: pip install requests pandas plotly psycopg2-binary
-      
+
       - name: Refresh materialized views
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           python - <<'EOF'
-          import os, psycopg2
+          import os
+          import psycopg2
+
           url = os.environ.get("SUPABASE_DB_URL")
+
           print("Secret exists:", url is not None)
           print("Secret length:", len(url) if url else 0)
+
           if not url:
               raise RuntimeError("SUPABASE_DB_URL IS EMPTY")
-          conn = psycopg2.connect(os.environ["SUPABASE_DB_URL"])
+
+          conn = psycopg2.connect(url)
           conn.autocommit = True
           cur = conn.cursor()
-          for v in ["card_stats_by_version", "char_ascension_by_version", "char_daily_by_version", "card_stats", "relic_stats", "runs_per_day", "runs_per_hour"]:
+
+          for v in [
+              "card_stats",
+              "relic_stats",
+              "runs_per_day",
+              "runs_per_hour",
+          ]:
               print(f"refreshing {v}...", flush=True)
               cur.execute(f"refresh materialized view {v};")
-          cur.close(); conn.close()
+
+          cur.close()
+          conn.close()
+
           print("done")
           EOF
+
       - name: Generate site
         env:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: python dashboard/build.py
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
