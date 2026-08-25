@@ -19,12 +19,18 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install requests pandas plotly psycopg2-binary
+      
       - name: Refresh materialized views
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           python - <<'EOF'
           import os, psycopg2
+          url = os.environ.get("SUPABASE_DB_URL")
+          print("Secret exists:", url is not None)
+          print("Secret length:", len(url) if url else 0)
+          if not url:
+              raise RuntimeError("SUPABASE_DB_URL IS EMPTY")
           conn = psycopg2.connect(os.environ["SUPABASE_DB_URL"])
           conn.autocommit = True
           cur = conn.cursor()
