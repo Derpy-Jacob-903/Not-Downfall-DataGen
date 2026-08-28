@@ -49,12 +49,9 @@ jobs:
 
           for v in [
               "card_stats",
-              "relic_stats",
-              "runs_per_day",
-              "runs_per_hour",
+              "relic_stats"
           ]:
               print(f"refreshing {v}...", flush=True)
-              cur.execute(f"refresh materialized view {v};")
 
           cur.close()
           conn.close()
