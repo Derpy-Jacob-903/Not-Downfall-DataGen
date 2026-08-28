@@ -118,10 +118,6 @@
             </div>
             <div id="scatter" class="chart"></div>
         </div>
-        <div class="chart-row">
-            <div class="card"><div class="card-head"><h2>Runs per day</h2></div><div id="perday" class="chart mini"></div></div>
-            <div class="card"><div class="card-head"><h2>Runs per hour</h2></div><div id="perhour" class="chart mini"></div></div>
-        </div>
         <div class="card">
             <div class="card-head"><h2>Winrate &times; ascension</h2><span class="hint">per character &middot; points with &ge;5 runs</span></div>
             <div id="asc" class="chart wide"></div>
@@ -145,7 +141,9 @@
     </main>
 </div>
 <script>
-    const CHAR_ORDER=["HERMIT","GUARDIAN","AUTOMATON","SLIMEBOSS","SNECKO","AWAKENED","CHAMP","HEXAGHOST"];
+    const CHAR_ORDER=["JESTER-JESTER",
+    "MOONSCREEDPORT-ARCRANE", "MOONSCREEDPORT-AYTEK", "MOONSCREEDPORT-ECHO", "MOONSCREEDPORT-POLARIX",
+    "THERAILGUN2-THE_RAILGUN2"];
     function hsv2rgb(h,s,v){
         const i=Math.floor(h*6),f=h*6-i,p=v*(1-s),q=v*(1-s*f),t=v*(1-s*(1-f));
         const c=[[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i%6];
@@ -153,6 +151,15 @@
     }
     const COLORS={}; CHAR_ORDER.forEach((n,i)=>COLORS[n]=hsv2rgb(i/CHAR_ORDER.length,0.65,0.80));
     COLORS["COLORLESS"]="#999999";
+    COLORS["BLDSURV-BLD_SURV"] = "#56a786";
+    COLORS["DRUIDSURV-DRUID_SURV"] = "#974d2c";
+    COLORS["DRUIDSURV-WIZARD_SURV"] = "#C45B6F";
+    COLORS["JESTER-JESTER"] = "#ff00ae";
+    COLORS["THERAILGUN2-THE_RAILGUN2"] = "#33FFAD";
+    COLORS["MOONSCREEDPORT-ARCRANE"] = "#bbdb44";
+    COLORS["MOONSCREEDPORT-AYTEK"] = "#f65d34";
+    COLORS["MOONSCREEDPORT-ECHO"] = "#3dd9ca";
+    COLORS["MOONSCREEDPORT-POLARIX"] = "#D780FF";
     const RSYM={Common:"circle",Uncommon:"diamond",Rare:"star",Basic:"circle-open",Token:"cross",Ancient:"hexagram"};
     const ASC_MIN=5, DAY_MIN=5;   // per-point run thresholds for the character charts
     let CARDS=[], ACT={day:[],hour:[]}, CHARD={ascension:[],daily:[]}, RELICS=[];
