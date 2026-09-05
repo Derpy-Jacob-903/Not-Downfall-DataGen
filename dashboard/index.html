@@ -147,7 +147,7 @@
 <script>
     const CHAR_ORDER=["JESTER",
     "ARCRANE", "AYTEK", "ECHO", "POLARIX",
-    "THE_RAILGUN2"];
+    "THERAILGUN2"];
     function hsv2rgb(h,s,v){
         const i=Math.floor(h*6),f=h*6-i,p=v*(1-s),q=v*(1-s*f),t=v*(1-s*(1-f));
         const c=[[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i%6];
@@ -155,11 +155,11 @@
     }
     const COLORS={}; CHAR_ORDER.forEach((n,i)=>COLORS[n]=hsv2rgb(i/CHAR_ORDER.length,0.65,0.80));
     COLORS["COLORLESS"]="#999999";
-    COLORS["BLD_SURV"] = "#56a786";
-    COLORS["DRUID_SURV"] = "#974d2c";
-    COLORS["WIZARD_SURV"] = "#C45B6F";
+    COLORS["BLDSURV"] = "#56a786";
+    COLORS["DRUIDSURV"] = "#974d2c";
+    COLORS["WIZARDSURV"] = "#C45B6F";
     COLORS["JESTER"] = "#ff00ae";
-    COLORS["THE_RAILGUN2"] = "#33FFAD";
+    COLORS["THERAILGUN2"] = "#33FFAD";
     COLORS["ARCRANE"] = "#bbdb44";
     COLORS["AYTEK"] = "#f65d34";
     COLORS["ECHO"] = "#3dd9ca";
@@ -168,7 +168,7 @@
     const ASC_MIN=5, DAY_MIN=5;   // per-point run thresholds for the character charts
     let CARDS=[], ACT={day:[],hour:[]}, CHARD={ascension:[],daily:[]}, RELICS=[];
     const state={version:"all",rarity:"all",minRuns:20,mode:"all",showBase:false,chars:new Set(CHAR_ORDER.concat("COLORLESS"))};
-    const charPrefix=s=>{const p=String(s).split("-")[1];return CHAR_ORDER.includes(p)?p:"COLORLESS";};
+    const charPrefix=s=>{const p=String(s).split("-")[0];return CHAR_ORDER.includes(p)?p:"COLORLESS";};
     const titlecase=s=>s[0]+s.slice(1).toLowerCase();
     const num=x=>{const n=+x;return isFinite(n)?n:0;};
 
