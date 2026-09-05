@@ -445,7 +445,7 @@
             drawRelics();
         });
     });
-    window.addEventListener("resize",()=>["scatter","relics","perday","perhour","asc","daily"].forEach(id=>{const el=document.getElementById(id);if(el&&el.data)Plotly.Plots.resize(id);}));
+    window.addEventListener("resize",()=>["scatter","relics","asc","daily"].forEach(id=>{const el=document.getElementById(id);if(el&&el.data)Plotly.Plots.resize(id);}));
 
     async function init(){
         try{
