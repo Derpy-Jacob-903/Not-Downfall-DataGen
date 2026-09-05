@@ -291,19 +291,6 @@
         return `rgba(${r},${g},${b},${a})`;
     }
 
-    function drawActivity(){
-        const day=aggActivity("day"), hour=aggActivity("hour");
-        Plotly.react("perday", stackTraces(day,"d"),
-            darkLayout({showlegend:true,legend:{font:{color:"#c9c1da",size:11}},
-                xaxis:{gridcolor:"#2a2338"},yaxis:{gridcolor:"#2a2338",rangemode:"tozero"}}),
-            {displayModeBar:false,responsive:true});
-        Plotly.react("perhour", stackTraces(hour,"h"),
-            darkLayout({showlegend:true,legend:{font:{color:"#c9c1da",size:11}},
-                xaxis:{gridcolor:"#2a2338"},yaxis:{gridcolor:"#2a2338",rangemode:"tozero"}}),
-            {displayModeBar:false,responsive:true});
-        document.getElementById("s-runs").textContent=day.total.toLocaleString();
-    }
-
     function aggRelics(){
         const byRelic={};
         for(const r of RELICS){
@@ -411,7 +398,7 @@
             {displayModeBar:false,responsive:true});
     }
 
-    function renderAll(){drawScatter();drawRelics();drawActivity();drawChars();}
+    function renderAll(){drawScatter();drawRelics();drawChars();}
 
     function buildChars(){
         const box=document.getElementById("chars");
