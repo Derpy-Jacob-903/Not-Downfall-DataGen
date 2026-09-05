@@ -118,6 +118,10 @@
             </div>
             <div id="scatter" class="chart"></div>
         </div>
+        <div class="chart-row">
+            <div class="card"><div class="card-head"><h2>Runs per day</h2></div><div id="perday" class="chart mini"></div></div>
+            <div class="card"><div class="card-head"><h2>Runs per hour</h2></div><div id="perhour" class="chart mini"></div></div>
+        </div>
         <div class="card">
             <div class="card-head"><h2>Winrate &times; ascension</h2><span class="hint">per character &middot; points with &ge;5 runs</span></div>
             <div id="asc" class="chart wide"></div>
@@ -201,6 +205,19 @@
                 offered:a.offered_3c,isStarter:isStarter}));
         }
         return out;
+    }
+
+    function drawActivity(){
+        const day=aggActivity("day"), hour=aggActivity("hour");
+        Plotly.react("perday", stackTraces(day,"d"),
+            darkLayout({showlegend:true,legend:{font:{color:"#c9c1da",size:11}},
+                xaxis:{gridcolor:"#2a2338"},yaxis:{gridcolor:"#2a2338",rangemode:"tozero"}}),
+            {displayModeBar:false,responsive:true});
+        Plotly.react("perhour", stackTraces(hour,"h"),
+            darkLayout({showlegend:true,legend:{font:{color:"#c9c1da",size:11}},
+                xaxis:{gridcolor:"#2a2338"},yaxis:{gridcolor:"#2a2338",rangemode:"tozero"}}),
+            {displayModeBar:false,responsive:true});
+        document.getElementById("s-runs").textContent=day.total.toLocaleString();
     }
 
     function drawScatter(){
@@ -398,7 +415,7 @@
             {displayModeBar:false,responsive:true});
     }
 
-    function renderAll(){drawScatter();drawRelics();drawChars();}
+    function renderAll(){drawScatter();drawRelics();drawActivity();drawChars();}
 
     function buildChars(){
         const box=document.getElementById("chars");
@@ -445,7 +462,7 @@
             drawRelics();
         });
     });
-    window.addEventListener("resize",()=>["scatter","relics","asc","daily"].forEach(id=>{const el=document.getElementById(id);if(el&&el.data)Plotly.Plots.resize(id);}));
+    window.addEventListener("resize",()=>["scatter","relics","perday","perhour","asc","daily"].forEach(id=>{const el=document.getElementById(id);if(el&&el.data)Plotly.Plots.resize(id);}));
 
     async function init(){
         try{
