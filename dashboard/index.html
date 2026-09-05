@@ -168,7 +168,7 @@
     const ASC_MIN=5, DAY_MIN=5;   // per-point run thresholds for the character charts
     let CARDS=[], ACT={day:[],hour:[]}, CHARD={ascension:[],daily:[]}, RELICS=[];
     const state={version:"all",rarity:"all",minRuns:20,mode:"all",showBase:false,chars:new Set(CHAR_ORDER.concat("COLORLESS"))};
-    const charPrefix=s=>{const p=String(s).split("-")[0];return CHAR_ORDER.includes(p)?p:"COLORLESS";};
+    const charPrefix=s=>{const p=String(s).split("-")[1];return CHAR_ORDER.includes(p)?p:"COLORLESS";};
     const titlecase=s=>s[0]+s.slice(1).toLowerCase();
     const num=x=>{const n=+x;return isFinite(n)?n:0;};
 
