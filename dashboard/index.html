@@ -155,26 +155,26 @@
     }
     const COLORS={}; CHAR_ORDER.forEach((n,i)=>COLORS[n]=hsv2rgb(i/CHAR_ORDER.length,0.65,0.80));
     COLORS["COLORLESS"]="#999999";
-    COLORS["MOONSCREEDPORT"]="#999999";
     COLORS["BLDSURV"] = "#56a786";
     COLORS["DRUIDSURV"] = "#974d2c";
     COLORS["WIZARDSURV"] = "#C45B6F";
     COLORS["JESTER"] = "#ff00ae";
     COLORS["THERAILGUN2"] = "#33FFAD";
-    COLORS["ARCRANE"] = "#bbdb44";
-    COLORS["AYTEK"] = "#f65d34";
-    COLORS["ECHO"] = "#3dd9ca";
-    COLORS["POLARIX"] = "#D780FF";
+    COLORS["MOONSCREEDPORT"]="#4057d6";
+    COLORS["MCPARCRANE"] = "#bbdb44";
+    COLORS["MCPAYTEK"] = "#f65d34";
+    COLORS["MCPECHO"] = "#3dd9ca";
+    COLORS["MCPPOLARIX"] = "#D780FF";
     const CHAR_NAMES={
-        COLORLESS:"Jester",
+        JESTER:"Jester",
         BLDSURV:"Blindside",
         DRUIDSURV:"Druid",
-        MOONSCREEDPORTARCRANE:"Arcrane",
-        MOONSCREEDPORTAYTEK:"Aytek",
-        MOONSCREEDPORTECHO:"Echo",
-        MOONSCREEDPORTPOLARIX:"Polarix",
+        MCPARCRANE:"Arcrane",
+        MCPAYTEK:"Aytek",
+        MCPECHO:"Echo",
+        MCPPOLARIX:"Polarix",
         COLORLESS:"Colorless",
-        MOONSCREEDPORT:"Collarless",
+        MOONSCREEDPORT:"Colorless (MoonsCreedPort)",
         THERAILGUN2:"Railgun"
     };
     const RSYM={Common:"circle",Uncommon:"diamond",Rare:"star",Basic:"circle-open",Token:"cross",Ancient:"hexagram"};
@@ -182,7 +182,7 @@
     let CARDS=[], ACT={day:[],hour:[]}, CHARD={ascension:[],daily:[]}, RELICS=[];
     const state={version:"all",rarity:"all",minRuns:0,mode:"all",showBase:false,chars:new Set(CHAR_ORDER.concat("COLORLESS"))};
     const charPrefix=s=>{const p=String(s).split("-")[0];return CHAR_ORDER.includes(p)?p:"COLORLESS";};
-    const titlecase=s=>s[0]+s.slice(1).toLowerCase();
+    const titlecase=s=> CHAR_NAMES[s[0]]|| s[0]+s.slice(1).toLowerCase();
     const num=x=>{const n=+x;return isFinite(n)?n:0;};
 
     function aggCards(){
