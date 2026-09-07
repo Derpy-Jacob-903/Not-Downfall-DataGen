@@ -166,23 +166,21 @@
     COLORS["MCPECHO"] = "#3dd9ca";
     COLORS["MCPPOLARIX"] = "#D780FF";
     const CHAR_NAMES={
-        JESTER:"Jester",
-        BLDSURV:"Blindside",
-        DRUIDSURV:"Druid",
-        MCPARCRANE:"Arcrane",
-        MCPAYTEK:"Aytek",
-        MCPECHO:"Echo",
-        MCPPOLARIX:"Polarix",
-        COLORLESS:"Colorless",
-        MOONSCREEDPORT:"Colorless (MoonsCreedPort)",
-        THERAILGUN2:"Railgun"
+        Bldsurv:"Blindside",
+        Druidsurv:"Druid",
+        Mcparcrane:"Arcrane",
+        Mcpaytek:"Aytek",
+        Mcpecho:"Echo",
+        Mcppolarix:"Polarix",
+        Moonscreedport:"Colorless (MoonsCreedPort)",
+        Therailgun2:"Railgun"
     };
     const RSYM={Common:"circle",Uncommon:"diamond",Rare:"star",Basic:"circle-open",Token:"cross",Ancient:"hexagram"};
     const ASC_MIN=0, DAY_MIN=0;   // per-point run thresholds for the character charts
     let CARDS=[], ACT={day:[],hour:[]}, CHARD={ascension:[],daily:[]}, RELICS=[];
     const state={version:"all",rarity:"all",minRuns:0,mode:"all",showBase:false,chars:new Set(CHAR_ORDER.concat("COLORLESS"))};
     const charPrefix=s=>{const p=String(s).split("-")[0];return CHAR_ORDER.includes(p)?p:"COLORLESS";};
-    const titlecase=s=> CHAR_NAMES[s[0]]|| s[0]+s.slice(1).toLowerCase();
+    const titlecase=s=>s[0]+s.slice(1).toLowerCase();
     const num=x=>{const n=+x;return isFinite(n)?n:0;};
 
     function aggCards(){
