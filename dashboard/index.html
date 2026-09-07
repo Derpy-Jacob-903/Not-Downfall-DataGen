@@ -306,10 +306,10 @@
         const pres=Object.keys(agg.perChar)
             .sort((a,b)=>CHAR_ORDER.indexOf(a)-CHAR_ORDER.indexOf(b));
         return pres.map(pre=>({
-            type:"scatter",mode:"none",name:CHAR_NAMES[pre]||titlecase(pre),
+            type:"scatter",mode:"none",name:titlecase(pre),
             stackgroup:groupId, fillcolor:hexA(COLORS[pre],0.55),
             x:agg.buckets, y:agg.buckets.map(b=>agg.perChar[pre][b]||0),
-            hovertemplate:"%{x}<br>"+CHAR_NAMES[pre]||titlecase(pre)+": %{y} runs<extra></extra>",
+            hovertemplate:"%{x}<br>"+titlecase(pre)+": %{y} runs<extra></extra>",
         }));
     }
 
@@ -402,12 +402,12 @@
             let keys=Object.keys(g[f]).filter(k=>g[f][k].runs>=minRuns);
             keys.sort(numericX?(a,b)=>(+a)-(+b):(a,b)=>a<b?-1:1);
             if(!keys.length) continue;
-            traces.push({type:"scatter",mode:"lines+markers",name:CHAR_NAMES[pre]||titlecase(pre),
+            traces.push({type:"scatter",mode:"lines+markers",name:titlecase(pre),
                 x:keys.map(k=>numericX?+k:k),
                 y:keys.map(k=>g[f][k].wins/g[f][k].runs),
                 line:{color:COLORS[pre],width:2},marker:{size:5,color:COLORS[pre]},
                 customdata:keys.map(k=>[g[f][k].runs]),
-                hovertemplate:"winrate %{y:.1%}<br>n=%{customdata[0]}<extra>"+CHAR_NAMES[pre]||titlecase(pre)+"</extra>"});
+                hovertemplate:"winrate %{y:.1%}<br>n=%{customdata[0]}<extra>"+titlecase(pre)+"</extra>"});
         }
         return traces;
     }
@@ -439,7 +439,7 @@
             const el=document.createElement("label");
             el.className="check on";el.dataset.c=c;
             el.innerHTML='<span class="swatch" style="background:'+COLORS[c]+';color:'+COLORS[c]+';border-color:'+COLORS[c]+'"></span>'+
-                '<span class="nm">'+CHAR_NAMES[pre]||titlecase(pre)+'</span>';
+                '<span class="nm">'+titlecase(c)+'</span>';
             el.addEventListener("click",()=>{
                 const on=el.classList.toggle("on");
                 if(on)state.chars.add(c);else state.chars.delete(c);
