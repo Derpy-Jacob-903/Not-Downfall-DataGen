@@ -7,11 +7,11 @@ SUPABASE_URL = "https://poefclgeeqhmtpdcrcev.supabase.co"
 # Palette configuration
 S, V = 0.65, 0.80
 ORDER = [
-    #"BLDSURV-BLD_SURV", 
+    #"BLDSURV", 
     #"DRUIDSURV-DRUID_SURV", "DRUIDSURV-WIZARD_SURV"
-    "JESTER-JESTER",
-    "MCPARCRANE-ARCRANE", "MCPAYTEK-AYTEK", "MCPECHO-ECHO", "MCPPOLARIX-POLARIX",
-    "THERAILGUN2-THE_RAILGUN2", 
+    "JESTER",
+    "MCPARCRANE", "MCPAYTEK", "MCPECHO", "MCPPOLARIX",
+    "THERAILGUN2", 
 ]
 CHAR_ORDER = [c.split("-")[0] for c in ORDER]
 
