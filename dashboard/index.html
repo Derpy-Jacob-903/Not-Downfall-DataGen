@@ -178,7 +178,7 @@
     const RSYM={Common:"circle",Uncommon:"diamond",Rare:"star",Basic:"circle-open",Token:"cross",Ancient:"hexagram"};
     const ASC_MIN=0, DAY_MIN=0;   // per-point run thresholds for the character charts
     let CARDS=[], ACT={day:[],hour:[]}, CHARD={ascension:[],daily:[]}, RELICS=[];
-    const state={version:"all",rarity:"all",minRuns:0,mode:"all",showBase:false,chars:new Set(CHAR_ORDER.concat("COLORLESS"))};
+    const state={version:"all",rarity:"all",minRuns:0,mode:"all",showBase:false,chars:new Set(CHAR_ORDER.concat("JESTER"))};
     const charPrefix=s=>{const p=String(s).split("-")[0];return CHAR_ORDER.includes(p)?p:"JESTER";};
     const titlecase=s=>s[0]+s.slice(1).toLowerCase();
     const num=x=>{const n=+x;return isFinite(n)?n:0;};
@@ -337,7 +337,7 @@
         const out=[];
         for(const k in byRelic){
             const a=byRelic[k], ch=charPrefix(a.relic);
-            const isBase=ch==="COLORLESS";
+            const isBase=ch==="COLORLESS"||ch==="JESTER";
             if(isBase){ if(!state.showBase) continue; }      // graph toggle only
             else if(!state.chars.has(ch)) continue;          // side character filter
             let runs,wins;
