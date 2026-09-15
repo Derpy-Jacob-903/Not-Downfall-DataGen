@@ -32,6 +32,6 @@ COLORS["MCPPOLARIX"] = "#D780FF"
 
 
 def char_of(entity_name: str) -> str:
-    """Extract character prefix or fall back to COLORLESS."""
+    """Extract character prefix or fall back to JESTER."""
     prefix = str(entity_name).split("-", 1)[0]
-    return prefix if prefix in set(CHAR_ORDER) else "COLORLESS"
+    return prefix if prefix in set(CHAR_ORDER) else "JESTER"
